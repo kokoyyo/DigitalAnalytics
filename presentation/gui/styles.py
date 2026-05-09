@@ -5,12 +5,12 @@ import tkinter as tk
 
 
 class Colors:
-    """Цветовая схема"""
+    """Цветовая схема - простая версия"""
     # Основные цвета
-    PRIMARY = "#2196F3"  # Синий
+    PRIMARY = "#2196F3"
     PRIMARY_DARK = "#1976D2"
     PRIMARY_LIGHT = "#BBDEFB"
-    SECONDARY = "#FF9800"  # Оранжевый
+    SECONDARY = "#FF9800"
     SECONDARY_DARK = "#F57C00"
     
     # Фоновые цвета
@@ -21,15 +21,15 @@ class Colors:
     # Текст
     TEXT_DARK = "#212121"
     TEXT_GRAY = "#757575"
-    TEXT_LIGHT = "#FFFFFF"  # Добавлено! Для светлого текста на темном фоне
-    WHITE = "#FFFFFF"  # Добавлено для обратной совместимости
+    TEXT_LIGHT = "#FFFFFF"
+    WHITE = "#FFFFFF"
     BLACK = "#000000"
     
     # Статусы
-    SUCCESS = "#4CAF50"  # Зеленый
-    ERROR = "#F44336"    # Красный
-    WARNING = "#FFC107"  # Желтый
-    INFO = "#2196F3"     # Синий
+    SUCCESS = "#4CAF50"
+    ERROR = "#F44336"
+    WARNING = "#FFC107"
+    INFO = "#2196F3"
     
     # Дополнительные
     BORDER = "#E0E0E0"
@@ -51,16 +51,14 @@ def setup_styles():
     """Настройка стилей для ttk виджетов"""
     style = ttk.Style()
     
-    # Стиль для прогресс-бара
     style.configure(
         "Success.Horizontal.TProgressbar",
         troughcolor=Colors.BORDER,
         background=Colors.SUCCESS,
-        thickness=12,  # Увеличенная толщина
+        thickness=12,
         relief=tk.FLAT
     )
     
-    # Настройка для всех прогресс-баров
     style.configure(
         "TProgressbar",
         troughcolor=Colors.BORDER,
