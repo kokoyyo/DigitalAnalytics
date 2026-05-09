@@ -1,9 +1,10 @@
 """Настройка SQLite базы данных и модели"""
 
-from sqlalchemy import create_engine, Column, Integer, String, ForeignKey, DateTime, Float
+from sqlalchemy import create_engine, Column, Integer, String, ForeignKey, DateTime, Float, Boolean
 from sqlalchemy.ext.declarative import declarative_base
 from sqlalchemy.orm import sessionmaker, relationship
 from datetime import datetime
+import os
 
 # Создаем базовый класс для моделей
 Base = declarative_base()
@@ -24,6 +25,16 @@ class Deck(Base):
     
     def __repr__(self):
         return f"<Deck(id={self.id}, name='{self.name}')>"
+    
+    def to_dict(self):
+        return {
+            'id': self.id,
+            'name': self.name,
+            'description': self.description,
+            'cards_count': len(self.cards),
+            'studied_count': sum(1 for c in self.cards if c.status == 'studied'),
+            'progress': (sum(1 for c in self.cards if c.status == 'studied') / len(self.cards) * 100) if len(self.cards) > 0 else 0
+        }
 
 
 class Card(Base):
@@ -50,10 +61,22 @@ class Card(Base):
     
     def __repr__(self):
         return f"<Card(id={self.id}, word='{self.word}')>"
+    
+    def to_dict(self):
+        return {
+            'id': self.id,
+            'word': self.word,
+            'translation': self.translation,
+            'example': self.example,
+            'transcription': self.transcription,
+            'status': self.status,
+            'deck_id': self.deck_id
+        }
 
 
 # Настройка подключения к базе данных
-DATABASE_URL = "sqlite:///flashcard.db"
+DB_PATH = os.path.join(os.path.dirname(os.path.dirname(__file__)), 'flashcard.db')
+DATABASE_URL = f"sqlite:///{DB_PATH}"
 
 # Создаем движок
 engine = create_engine(DATABASE_URL, echo=False)
