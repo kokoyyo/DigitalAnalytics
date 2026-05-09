@@ -18,6 +18,9 @@ class MainApplication:
         self.root.geometry("1000x700")
         self.root.minsize(600, 500)
         
+        # Сохраняем ссылку на себя в корневом окне
+        self.root.main_app = self
+        
         # Настройка стилей
         setup_styles()
         
@@ -79,6 +82,10 @@ class MainApplication:
     def clear_content(self):
         if self.current_frame:
             self.current_frame.destroy()
+    
+    def set_current_frame(self, frame):
+        """Установить текущий фрейм"""
+        self.current_frame = frame
     
     def show_home_screen(self):
         self.clear_content()

@@ -84,33 +84,29 @@ class HomeScreen(tk.Frame):
         self.canvas.pack(side="left", fill="both", expand=True)
         scrollbar.pack(side="right", fill="y")
         
-        self.canvas.bind("<MouseWheel>", self._on_mousewheel)
-        self.decks_frame.bind("<MouseWheel>", self._on_mousewheel)
+        # Привязываем колесико мыши
+        def _on_mousewheel(event):
+            self.canvas.yview_scroll(int(-1*(event.delta/120)), "units")
+        
+        self.canvas.bind("<MouseWheel>", _on_mousewheel)
+        self.decks_frame.bind("<MouseWheel>", _on_mousewheel)
         self.canvas.bind("<Configure>", self._on_canvas_configure)
     
     def _on_canvas_configure(self, event):
-        """Обновление ширины контента при изменении размера canvas"""
         self.canvas.itemconfig(1, width=event.width)
         self.update_deck_widths(event.width)
     
-    def _on_mousewheel(self, event):
-        """Прокрутка колесиком мыши"""
-        self.canvas.yview_scroll(int(-1*(event.delta/120)), "units")
-    
     def on_resize(self, event):
-        """Обработчик изменения размера окна"""
         if hasattr(self, 'canvas') and self.canvas.winfo_width() > 0:
             self.update_deck_widths(self.canvas.winfo_width())
     
     def update_deck_widths(self, width):
-        """Обновление ширины всех карточек колод"""
         if width > 0:
             for frame in self.deck_frames:
                 if hasattr(frame, 'desc_label') and frame.desc_label:
                     frame.desc_label.config(wraplength=width - 80)
     
     def update_statistics(self):
-        """Обновление статистики"""
         total_cards = 0
         studied_cards = 0
         
@@ -126,7 +122,6 @@ class HomeScreen(tk.Frame):
         )
     
     def load_decks(self):
-        """Загрузка колод из БД"""
         for widget in self.decks_frame.winfo_children():
             widget.destroy()
         
@@ -151,9 +146,20 @@ class HomeScreen(tk.Frame):
         
         if hasattr(self, 'canvas') and self.canvas.winfo_width() > 0:
             self.update_deck_widths(self.canvas.winfo_width())
-    
+    def open_deck_by_id(self, deck_id):
+        """Открыть колоду по ID"""
+        print(f"open_deck_by_id ВЫЗВАН для ID: {deck_id}")
+        
+        # Получаем колоду из репозитория
+        deck = self.deck_repo.get_by_id(deck_id)
+        if deck:
+            self.open_deck(deck)
+        else:
+            print(f"Колода с ID {deck_id} не найдена!")
+
+
+            
     def create_deck_card(self, deck):
-        """Создание карточки колоды"""
         cards = self.card_repo.get_by_deck(deck.id)
         total_cards = len(cards)
         studied_cards = sum(1 for c in cards if c.status == 'studied')
@@ -161,21 +167,24 @@ class HomeScreen(tk.Frame):
         
         current_width = self.canvas.winfo_width() if hasattr(self, 'canvas') and self.canvas.winfo_width() > 0 else 800
         
-        card_frame = tk.Frame(
+        # Сохраняем ID колоды для использования в lambda
+        deck_id = deck.id
+        deck_name = deck.name
+        
+        # СОЗДАЕМ КНОПКУ - используем фиксированное значение через default аргумент
+        card_btn = tk.Button(
             self.decks_frame,
             bg=Colors.BG_WHITE,
             relief=tk.RAISED,
             bd=2,
-            cursor="hand2"
+            cursor="hand2",
+            command=lambda d_id=deck_id: self.open_deck_by_id(d_id)  # Передаем ID, а не объект
         )
-        card_frame.pack(fill=tk.X, pady=10, padx=5)
+        card_btn.pack(fill=tk.X, pady=10, padx=5)
         
-        # Привязываем событие клика на всю карточку
-        card_frame.bind("<Button-1>", lambda e, d=deck: self.open_deck(d))
+        self.deck_frames.append(card_btn)
         
-        self.deck_frames.append(card_frame)
-        
-        inner_frame = tk.Frame(card_frame, bg=Colors.BG_WHITE)
+        inner_frame = tk.Frame(card_btn, bg=Colors.BG_WHITE)
         inner_frame.pack(fill=tk.BOTH, expand=True, padx=15, pady=12)
         
         # Верхняя строка
@@ -191,7 +200,8 @@ class HomeScreen(tk.Frame):
             cursor="hand2"
         )
         name_label.pack(side=tk.LEFT)
-        name_label.bind("<Button-1>", lambda e, d=deck: self.open_deck(d))
+        # Для Label тоже используем ID
+        name_label.bind("<Button-1>", lambda e, d_id=deck_id: self.open_deck_by_id(d_id))
         
         menu_btn = tk.Button(
             top_frame,
@@ -217,9 +227,7 @@ class HomeScreen(tk.Frame):
                 justify=tk.LEFT
             )
             desc_label.pack(anchor=tk.W, pady=(0, 10))
-            card_frame.desc_label = desc_label
-        else:
-            card_frame.desc_label = None
+            card_btn.desc_label = desc_label
         
         # Статистика
         stats_progress_frame = tk.Frame(inner_frame, bg=Colors.BG_WHITE)
@@ -256,30 +264,41 @@ class HomeScreen(tk.Frame):
         )
         progress_bar.pack(fill=tk.X, expand=True)
         
-        card_frame.current_width = current_width
-    
+        card_btn.current_width = current_width
+        
+        print(f"Создана кнопка для колоды: {deck.name} (ID: {deck_id})")
+
+
     def open_deck(self, deck):
-        """Открыть колоду - ИСПРАВЛЕННАЯ ВЕРСИЯ"""
+        """Открыть колоду"""
+        print(f"open_deck ВЫЗВАН для колоды: {deck.name} (ID: {deck.id})")
+        
         from presentation.gui.screens.deck_detail_screen import DeckDetailScreen
         
-        # Находим MainApplication через родительскую иерархию
-        main_app = self.master
+        # Ищем content_container вверх по иерархии
+        current = self
+        parent_container = None
+        while current:
+            if hasattr(current, 'content_container'):
+                parent_container = current.content_container
+                print("Нашли content_container!")
+                break
+            current = current.master
         
-        # Проверяем, что main_app имеет content_container
-        while not hasattr(main_app, 'content_container') and main_app != self.winfo_toplevel():
-            main_app = main_app.master
+        if not parent_container:
+            print("Не нашли content_container, используем self.master")
+            parent_container = self.master
         
-        if hasattr(main_app, 'content_container'):
-            # Очищаем контент
-            for widget in main_app.content_container.winfo_children():
-                widget.destroy()
-            
-            # Создаем экран деталей колоды
-            deck_screen = DeckDetailScreen(main_app.content_container, deck.id)
-            deck_screen.pack(fill=tk.BOTH, expand=True)
+        print(f"Очищаем контент")
+        for widget in parent_container.winfo_children():
+            widget.destroy()
+        
+        print(f"Создаем DeckDetailScreen")
+        deck_screen = DeckDetailScreen(parent_container, deck.id)
+        deck_screen.pack(fill=tk.BOTH, expand=True)
+        print("DeckDetailScreen создан")
     
     def show_context_menu(self, deck):
-        """Показать контекстное меню"""
         menu = tk.Menu(self, tearoff=0)
         menu.add_command(label="✏️ Редактировать", command=lambda: self.edit_deck(deck))
         menu.add_separator()
@@ -287,7 +306,6 @@ class HomeScreen(tk.Frame):
         menu.post(self.winfo_pointerx(), self.winfo_pointery())
     
     def add_deck(self):
-        """Добавить новую колоду"""
         dialog = tk.Toplevel(self)
         dialog.title("Создание новой колоды")
         dialog.geometry("450x350")
@@ -321,7 +339,6 @@ class HomeScreen(tk.Frame):
         tk.Button(btn_frame, text="Отмена", command=dialog.destroy, padx=25, pady=5).pack(side=tk.LEFT, padx=5)
     
     def edit_deck(self, deck):
-        """Редактирование колоды"""
         dialog = tk.Toplevel(self)
         dialog.title("Редактирование колоды")
         dialog.geometry("450x350")
@@ -357,7 +374,6 @@ class HomeScreen(tk.Frame):
         tk.Button(btn_frame, text="Отмена", command=dialog.destroy, padx=25, pady=5).pack(side=tk.LEFT, padx=5)
     
     def delete_deck(self, deck):
-        """Удаление колоды"""
         if messagebox.askyesno("Подтверждение", f"Вы действительно хотите удалить колоду '{deck.name}'?\nВсе карточки будут также удалены!"):
             self.deck_repo.delete(deck.id)
             self.load_decks()

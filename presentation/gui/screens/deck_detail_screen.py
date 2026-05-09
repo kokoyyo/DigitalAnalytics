@@ -17,7 +17,6 @@ class DeckDetailScreen(tk.Frame):
         self.deck = self.deck_repo.get_by_id(deck_id)
         self.current_filter = "all"
         self.cards = []
-        self.card_frames = []
         
         self.create_widgets()
         self.load_cards()
@@ -28,42 +27,28 @@ class DeckDetailScreen(tk.Frame):
     def on_resize(self, event):
         """Обновление при изменении размера"""
         if hasattr(self, 'empty_label') and self.empty_label:
+            # Центрируем сообщение об отсутствии карточек
             self.center_empty_message()
-        else:
-            self.update_cards_width()
     
     def center_empty_message(self):
         """Центрирование сообщения об отсутствии карточек"""
         if hasattr(self, 'empty_label') and self.empty_label:
+            # Получаем размеры контейнера
+            container_width = self.cards_container.winfo_width()
+            container_height = self.cards_container.winfo_height()
+            
+            # Центрируем метку
             self.empty_label.place(relx=0.5, rely=0.5, anchor="center")
-    
-    def update_cards_width(self):
-        """Обновление ширины карточек"""
-        if hasattr(self, 'canvas') and self.canvas.winfo_width() > 0:
-            new_width = self.canvas.winfo_width() - 30
-            for card_frame in self.card_frames:
-                try:
-                    card_frame.config(width=new_width)
-                    for child in card_frame.winfo_children():
-                        if hasattr(child, 'example_label'):
-                            child.example_label.config(wraplength=new_width - 60)
-                except:
-                    pass
-    
     
     def create_widgets(self):
         """Создание виджетов"""
-        # Верхняя панель с использованием Frame и pack для лучшего контроля
+        # Верхняя панель
         header_frame = tk.Frame(self, bg=Colors.BG_WHITE)
-        header_frame.pack(fill=tk.X, padx=20, pady=(20, 10))
+        header_frame.pack(fill=tk.X, padx=20, pady=20)
         
-        # Верхняя строка с названием и кнопками
-        top_row = tk.Frame(header_frame, bg=Colors.BG_WHITE)
-        top_row.pack(fill=tk.X, pady=(10, 5))
-        
-        # Название колоды (слева)
+        # Название колоды
         self.name_label = tk.Label(
-            top_row,
+            header_frame,
             text=self.deck.name,
             font=Fonts.TITLE,
             bg=Colors.BG_WHITE,
@@ -71,11 +56,10 @@ class DeckDetailScreen(tk.Frame):
         )
         self.name_label.pack(side=tk.LEFT, padx=20)
         
-        # Фрейм для кнопок (справа)
-        btn_frame = tk.Frame(top_row, bg=Colors.BG_WHITE)
+        # Кнопки действий
+        btn_frame = tk.Frame(header_frame, bg=Colors.BG_WHITE)
         btn_frame.pack(side=tk.RIGHT, padx=20)
         
-        # Кнопки действий
         test_btn = tk.Button(
             btn_frame,
             text="📝 Тест",
@@ -87,7 +71,7 @@ class DeckDetailScreen(tk.Frame):
             pady=5,
             cursor="hand2"
         )
-        test_btn.pack(side=tk.LEFT, padx=3)
+        test_btn.pack(side=tk.LEFT, padx=5)
         self.create_tooltip(test_btn, "Начать тестирование по колоде")
         
         edit_btn = tk.Button(
@@ -101,7 +85,7 @@ class DeckDetailScreen(tk.Frame):
             pady=5,
             cursor="hand2"
         )
-        edit_btn.pack(side=tk.LEFT, padx=3)
+        edit_btn.pack(side=tk.LEFT, padx=5)
         self.create_tooltip(edit_btn, "Редактировать название и описание колоды")
         
         delete_btn = tk.Button(
@@ -115,7 +99,7 @@ class DeckDetailScreen(tk.Frame):
             pady=5,
             cursor="hand2"
         )
-        delete_btn.pack(side=tk.LEFT, padx=3)
+        delete_btn.pack(side=tk.LEFT, padx=5)
         self.create_tooltip(delete_btn, "Удалить колоду и все карточки")
         
         back_btn = tk.Button(
@@ -129,12 +113,8 @@ class DeckDetailScreen(tk.Frame):
             pady=5,
             cursor="hand2"
         )
-        back_btn.pack(side=tk.LEFT, padx=3)
+        back_btn.pack(side=tk.LEFT, padx=5)
         self.create_tooltip(back_btn, "Вернуться к списку колод")
-        
-        # Добавляем разделительную линию
-        separator = tk.Frame(header_frame, bg=Colors.BORDER, height=2)
-        separator.pack(fill=tk.X, pady=(10, 5))
         
         # Фильтры
         filters_frame = tk.Frame(self, bg=Colors.BG_LIGHT)
@@ -162,46 +142,40 @@ class DeckDetailScreen(tk.Frame):
         cards_frame.pack(fill=tk.BOTH, expand=True, padx=20, pady=(0, 20))
         
         # Canvas для скроллинга
-        self.canvas = tk.Canvas(cards_frame, bg=Colors.BG_WHITE, highlightthickness=0)
-        scrollbar = ttk.Scrollbar(cards_frame, orient="vertical", command=self.canvas.yview)
-        self.cards_container = tk.Frame(self.canvas, bg=Colors.BG_WHITE)
+        canvas = tk.Canvas(cards_frame, bg=Colors.BG_WHITE, highlightthickness=0)
+        scrollbar = ttk.Scrollbar(cards_frame, orient="vertical", command=canvas.yview)
+        self.cards_container = tk.Frame(canvas, bg=Colors.BG_WHITE)
         
-        self.cards_container.bind("<Configure>", lambda e: self.canvas.configure(scrollregion=self.canvas.bbox("all")))
-        self.canvas.create_window((0, 0), window=self.cards_container, anchor="nw")
-        self.canvas.configure(yscrollcommand=scrollbar.set)
+        self.cards_container.bind("<Configure>", lambda e: canvas.configure(scrollregion=canvas.bbox("all")))
+        canvas.create_window((0, 0), window=self.cards_container, anchor="nw", width=780)
+        canvas.configure(yscrollcommand=scrollbar.set)
         
-        self.canvas.pack(side="left", fill="both", expand=True, padx=10, pady=10)
+        canvas.pack(side="left", fill="both", expand=True, padx=10, pady=10)
         scrollbar.pack(side="right", fill="y")
         
-    # Привязываем колесико мыши
-    def _on_mousewheel(event):
-        self.canvas.yview_scroll(int(-1*(event.delta/120)), "units")
-    
-    self.canvas.bind("<MouseWheel>", _on_mousewheel)
-    self.cards_container.bind("<MouseWheel>", _on_mousewheel)
-    self.canvas.bind("<Configure>", self.on_canvas_configure)
-    
-    # Кнопка добавления карточки
-    add_btn = tk.Button(
-        self,
-        text="+ Добавить карточку",
-        command=self.add_card,
-        bg=Colors.PRIMARY,
-        fg=Colors.WHITE,
-        font=Fonts.BUTTON,
-        padx=20,
-        pady=10,
-        cursor="hand2"
-    )
-    add_btn.pack(side=tk.BOTTOM, pady=20)
-    self.create_tooltip(add_btn, "Добавить новую карточку в колоду")
-
-
-    def on_canvas_configure(self, event):
-        """Обновление ширины при изменении canvas"""
-        if event.width > 0:
-            self.canvas.itemconfig(1, width=event.width)
-            self.update_cards_width()
+        # Привязываем колесико мыши
+        def _on_mousewheel(event):
+            canvas.yview_scroll(int(-1*(event.delta/120)), "units")
+        
+        canvas.bind("<MouseWheel>", _on_mousewheel)
+        self.cards_container.bind("<MouseWheel>", _on_mousewheel)
+        
+        self.canvas = canvas
+        
+        # Кнопка добавления карточки
+        add_btn = tk.Button(
+            self,
+            text="+ Добавить карточку",
+            command=self.add_card,
+            bg=Colors.PRIMARY,
+            fg=Colors.WHITE,
+            font=Fonts.BUTTON,
+            padx=20,
+            pady=10,
+            cursor="hand2"
+        )
+        add_btn.pack(side=tk.BOTTOM, pady=20)
+        self.create_tooltip(add_btn, "Добавить новую карточку в колоду")
     
     def create_tooltip(self, widget, text):
         """Создание всплывающей подсказки"""
@@ -223,13 +197,15 @@ class DeckDetailScreen(tk.Frame):
     
     def load_cards(self):
         """Загрузка карточек с фильтром"""
+        # Очищаем контейнер
         for widget in self.cards_container.winfo_children():
             widget.destroy()
         
-        self.card_frames.clear()
+        # Получаем карточки с фильтром
         self.cards = self.card_repo.get_by_deck(self.deck_id, self.current_filter)
         
         if not self.cards:
+            # Создаем центрированное сообщение
             self.empty_label = tk.Label(
                 self.cards_container,
                 text="📭 Нет карточек в этой колоде.\n\nНажмите кнопку '+ Добавить карточку'\nчтобы создать первую карточку",
@@ -246,25 +222,19 @@ class DeckDetailScreen(tk.Frame):
     
     def create_card_item(self, card):
         """Создание элемента карточки"""
-        current_width = self.canvas.winfo_width() if self.canvas.winfo_width() > 0 else 800
-        
-        card_frame = tk.Frame(
-            self.cards_container, 
-            bg=Colors.BG_WHITE, 
-            relief=tk.RIDGE, 
-            bd=1
-        )
+        # Карточка карточки
+        card_frame = tk.Frame(self.cards_container, bg=Colors.BG_WHITE, relief=tk.RIDGE, bd=1)
         card_frame.pack(fill=tk.X, pady=5, padx=5)
         
-        self.card_frames.append(card_frame)
-        
+        # Внутренний контейнер
         inner_frame = tk.Frame(card_frame, bg=Colors.BG_WHITE)
         inner_frame.pack(fill=tk.X, padx=15, pady=10)
         
-        # Слово и перевод
+        # Верхняя строка: слово и перевод
         word_frame = tk.Frame(inner_frame, bg=Colors.BG_WHITE)
         word_frame.pack(fill=tk.X, pady=(0, 5))
         
+        # Слово
         word_label = tk.Label(
             word_frame, 
             text=card.word, 
@@ -274,6 +244,7 @@ class DeckDetailScreen(tk.Frame):
         )
         word_label.pack(side=tk.LEFT)
         
+        # Перевод - убираем дефис, делаем красивое оформление
         translation_text = f"→ {card.translation}"
         trans_label = tk.Label(
             word_frame, 
@@ -284,7 +255,7 @@ class DeckDetailScreen(tk.Frame):
         )
         trans_label.pack(side=tk.LEFT, padx=(10, 0))
         
-        # Статус
+        # Индикатор статуса справа
         status_icon = "✅" if card.status == "studied" else "⭕"
         status_text = "Изучено" if card.status == "studied" else "Не изучено"
         
@@ -309,7 +280,7 @@ class DeckDetailScreen(tk.Frame):
         )
         status_text_label.pack(side=tk.LEFT, padx=(5, 0))
         
-        # Транскрипция
+        # Дополнительная информация
         if card.transcription:
             transcr_label = tk.Label(
                 inner_frame,
@@ -320,7 +291,6 @@ class DeckDetailScreen(tk.Frame):
             )
             transcr_label.pack(anchor=tk.W, pady=(0, 3))
         
-        # Пример
         if card.example:
             example_label = tk.Label(
                 inner_frame,
@@ -328,19 +298,20 @@ class DeckDetailScreen(tk.Frame):
                 font=("Segoe UI", 9),
                 bg=Colors.BG_WHITE,
                 fg=Colors.TEXT_GRAY,
-                wraplength=current_width - 60,
+                wraplength=700,
                 justify=tk.LEFT
             )
             example_label.pack(anchor=tk.W)
-            inner_frame.example_label = example_label
         
-        # Кнопки действий
+        # Нижняя панель с кнопками действий
         actions_frame = tk.Frame(inner_frame, bg=Colors.BG_WHITE)
         actions_frame.pack(fill=tk.X, pady=(10, 0))
         
+        # Разделитель
         separator = tk.Frame(actions_frame, bg=Colors.BORDER, height=1)
         separator.pack(fill=tk.X, pady=(0, 8))
         
+        # Кнопки с подписями
         # Кнопка изменения статуса
         status_btn_text = "✅ Отметить изученным" if card.status == "not_studied" else "🔄 Отметить неизученным"
         status_btn = tk.Button(
@@ -400,6 +371,20 @@ class DeckDetailScreen(tk.Frame):
         new_status = "studied" if card.status == "not_studied" else "not_studied"
         self.card_repo.update_status(card.id, new_status)
         self.load_cards()
+        # Обновляем прогресс на главном экране при возврате
+        self.update_main_screen_stats()
+    
+    def update_main_screen_stats(self):
+        """Обновление статистики на главном экране"""
+        # Находим главный экран и обновляем его
+        root = self.winfo_toplevel()
+        for widget in root.winfo_children():
+            if hasattr(widget, 'content_container'):
+                for child in widget.content_container.winfo_children():
+                    if hasattr(child, 'update_statistics'):
+                        child.update_statistics()
+                        child.load_decks()
+                        break
     
     def add_card(self):
         """Добавление карточки"""
@@ -410,11 +395,13 @@ class DeckDetailScreen(tk.Frame):
         dialog.transient(self)
         dialog.grab_set()
         
+        # Центрируем окно
         dialog.update_idletasks()
         x = (dialog.winfo_screenwidth() // 2) - (550 // 2)
         y = (dialog.winfo_screenheight() // 2) - (600 // 2)
         dialog.geometry(f"550x600+{x}+{y}")
         
+        # Поля ввода
         tk.Label(dialog, text="Слово (на английском):", font=Fonts.BODY).pack(pady=(20, 5), padx=20, anchor=tk.W)
         word_entry = tk.Entry(dialog, font=Fonts.BODY, width=50)
         word_entry.pack(padx=20, pady=5, fill=tk.X)
@@ -445,6 +432,7 @@ class DeckDetailScreen(tk.Frame):
                 self.card_repo.create(self.deck_id, word, translation, example, transcription)
                 dialog.destroy()
                 self.load_cards()
+                self.update_main_screen_stats()
                 messagebox.showinfo("Успех", "Карточка добавлена!")
             else:
                 messagebox.showwarning("Внимание", "Заполните слово и перевод!")
@@ -461,6 +449,7 @@ class DeckDetailScreen(tk.Frame):
         dialog.transient(self)
         dialog.grab_set()
         
+        # Центрируем окно
         dialog.update_idletasks()
         x = (dialog.winfo_screenwidth() // 2) - (550 // 2)
         y = (dialog.winfo_screenheight() // 2) - (600 // 2)
@@ -513,6 +502,7 @@ class DeckDetailScreen(tk.Frame):
         if messagebox.askyesno("Подтверждение", f"Удалить карточку '{card.word}'?"):
             self.card_repo.delete(card.id)
             self.load_cards()
+            self.update_main_screen_stats()
             messagebox.showinfo("Успех", "Карточка удалена")
     
     def edit_deck(self):
@@ -524,6 +514,7 @@ class DeckDetailScreen(tk.Frame):
         dialog.transient(self)
         dialog.grab_set()
         
+        # Центрируем окно
         dialog.update_idletasks()
         x = (dialog.winfo_screenwidth() // 2) - (450 // 2)
         y = (dialog.winfo_screenheight() // 2) - (350 // 2)
@@ -551,6 +542,7 @@ class DeckDetailScreen(tk.Frame):
                 self.name_label.config(text=self.deck.name)
                 dialog.destroy()
                 messagebox.showinfo("Успех", f"Колода '{name}' обновлена!")
+                self.update_main_screen_stats()
             else:
                 messagebox.showwarning("Внимание", "Введите название колоды")
         
@@ -570,25 +562,25 @@ class DeckDetailScreen(tk.Frame):
     
     def go_back(self):
         """Вернуться к списку колод"""
-        # Находим корневое окно
-        root = self.winfo_toplevel()
+        from presentation.gui.screens.home_screen import HomeScreen
         
-        # Ищем MainApplication (у него есть content_container)
-        main_app = None
-        for widget in root.winfo_children():
-            if hasattr(widget, 'content_container'):
-                main_app = widget
+        # Ищем content_container вверх по иерархии
+        current = self
+        parent_container = None
+        while current:
+            if hasattr(current, 'content_container'):
+                parent_container = current.content_container
                 break
+            current = current.master
         
-        if main_app:
-            # Очищаем content_container
-            for widget in main_app.content_container.winfo_children():
-                widget.destroy()
-            
-            # Создаем новый HomeScreen
-            from presentation.gui.screens.home_screen import HomeScreen
-            home_screen = HomeScreen(main_app.content_container)
-            home_screen.pack(fill=tk.BOTH, expand=True)
-            
-            # Уничтожаем текущий экран
-            self.destroy()
+        if not parent_container:
+            # Если не нашли, используем непосредственного родителя
+            parent_container = self.master
+        
+        # Очищаем текущий контент
+        for widget in parent_container.winfo_children():
+            widget.destroy()
+        
+        # Создаем главный экран
+        home_screen = HomeScreen(parent_container)
+        home_screen.pack(fill=tk.BOTH, expand=True)
