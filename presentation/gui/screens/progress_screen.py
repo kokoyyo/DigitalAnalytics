@@ -2,7 +2,9 @@
 
 import tkinter as tk
 from tkinter import ttk
+from datetime import datetime, timedelta
 from presentation.gui.styles import Colors, Fonts
+from data.repositories import DeckRepository, CardRepository, StatisticsRepository
 
 
 class ProgressScreen(tk.Frame):
@@ -10,89 +12,76 @@ class ProgressScreen(tk.Frame):
     
     def __init__(self, parent):
         super().__init__(parent, bg=Colors.BG_LIGHT)
+        self.parent = parent
+        self.deck_repo = DeckRepository()
+        self.card_repo = CardRepository()
+        self.stats_repo = StatisticsRepository()
         
         self.create_widgets()
+        self.load_data()
+        
+        # Привязываем событие изменения размера
+        self.bind("<Configure>", self.on_resize)
     
     def create_widgets(self):
-        """Создание виджетов"""
+        """Создание виджетов с прокруткой"""
         # Создаем Canvas для прокрутки
-        self.canvas = tk.Canvas(self, bg=Colors.BG_LIGHT, highlightthickness=0)
-        scrollbar = ttk.Scrollbar(self, orient="vertical", command=self.canvas.yview)
+        canvas = tk.Canvas(self, bg=Colors.BG_LIGHT, highlightthickness=0)
+        scrollbar = ttk.Scrollbar(self, orient="vertical", command=canvas.yview)
         
-        # Создаем фрейм для содержимого внутри Canvas
-        self.scrollable_frame = tk.Frame(self.canvas, bg=Colors.BG_LIGHT)
+        self.scrollable_frame = tk.Frame(canvas, bg=Colors.BG_LIGHT)
         self.scrollable_frame.bind(
             "<Configure>",
-            lambda e: self.canvas.configure(scrollregion=self.canvas.bbox("all"))
+            lambda e: canvas.configure(scrollregion=canvas.bbox("all"))
         )
         
-        self.canvas.create_window((0, 0), window=self.scrollable_frame, anchor="nw")
-        self.canvas.configure(yscrollcommand=scrollbar.set)
+        canvas.create_window((0, 0), window=self.scrollable_frame, anchor="nw")
+        canvas.configure(yscrollcommand=scrollbar.set)
         
-        # При изменении размера canvas обновляем ширину окна
-        self.canvas.bind("<Configure>", self._on_canvas_configure)
-        
-        self.canvas.pack(side="left", fill="both", expand=True)
+        canvas.pack(side="left", fill="both", expand=True)
+        canvas.bind("<Configure>", self.on_canvas_configure)
+        self.canvas = canvas
         scrollbar.pack(side="right", fill="y")
         
-        # Привязываем колесико мыши
         def _on_mousewheel(event):
-            self.canvas.yview_scroll(int(-1*(event.delta/120)), "units")
+            canvas.yview_scroll(int(-1*(event.delta/120)), "units")
         
-        self.canvas.bind("<MouseWheel>", _on_mousewheel)
+        canvas.bind("<MouseWheel>", _on_mousewheel)
         self.scrollable_frame.bind("<MouseWheel>", _on_mousewheel)
+    
+    def load_data(self):
+        """Загрузка всех данных с принудительным обновлением"""
+        # Очищаем старые данные
+        for widget in self.scrollable_frame.winfo_children():
+            widget.destroy()
         
-        # Создаем содержимое внутри скроллируемого фрейма
-        self.create_content(self.scrollable_frame)
+        # Принудительно получаем свежие данные из БД
+        self.stats_repo.refresh()
         
-        # Сохраняем ссылки на элементы, которые нужно обновлять
-        self.widgets_to_update = []
-    
-    def _on_canvas_configure(self, event):
-        """Обновление ширины при изменении размера canvas"""
-        canvas_width = event.width
-        # Обновляем ширину окна в canvas
-        self.canvas.itemconfig(1, width=canvas_width)
-        # Обновляем ширину всех виджетов
-        self.update_widgets_width(canvas_width)
-    
-    def update_widgets_width(self, width):
-        """Обновление ширины виджетов при изменении размера окна"""
-        if width > 0:
-            # Обновляем ширину фреймов-контейнеров
-            for widget in self.widgets_to_update:
-                if isinstance(widget, tuple):
-                    frame, padding = widget
-                    try:
-                        frame.config(width=width - padding)
-                    except:
-                        pass
-                elif hasattr(widget, 'config'):
-                    try:
-                        widget.config(width=width - 40)
-                    except:
-                        pass
-    
-    def create_content(self, parent):
-        """Создание содержимого экрана"""
-        current_width = self.canvas.winfo_width() if hasattr(self, 'canvas') and self.canvas.winfo_width() > 0 else 900
+        # Получаем данные
+        streak = self.stats_repo.get_current_streak()
+        today_stats = self.stats_repo.get_today_stats()
+        global_stats = self.stats_repo.get_global_stats()
+        total_studied_all_time = global_stats['studied_cards']
+        
+        # Отладка
+        print(f"ProgressScreen: Всего карточек={global_stats['total_cards']}, Изучено={global_stats['studied_cards']}")
         
         # Заголовок
-        header_frame = tk.Frame(parent, bg=Colors.BG_WHITE)
+        header_frame = tk.Frame(self.scrollable_frame, bg=Colors.BG_WHITE)
         header_frame.pack(fill=tk.X, padx=20, pady=20)
         
-        title_label = tk.Label(
+        tk.Label(
             header_frame,
             text="📊 Прогресс изучения",
             font=Fonts.TITLE,
             bg=Colors.BG_WHITE,
             fg=Colors.TEXT_DARK
-        )
-        title_label.pack(pady=20)
+        ).pack(pady=20)
         
-        # Достижения
+        # ===== ДОСТИЖЕНИЯ =====
         achievements_frame = tk.LabelFrame(
-            parent, 
+            self.scrollable_frame, 
             text="🏆 Достижения", 
             font=Fonts.SUBTITLE, 
             bg=Colors.BG_WHITE, 
@@ -100,25 +89,23 @@ class ProgressScreen(tk.Frame):
         )
         achievements_frame.pack(fill=tk.X, padx=20, pady=10)
         
-        # Контейнер для достижений с адаптивной сеткой
+        # Карточки достижений
         ach_container = tk.Frame(achievements_frame, bg=Colors.BG_WHITE)
         ach_container.pack(fill=tk.BOTH, expand=True, pady=20, padx=10)
         
-        # Настройка весов для равномерного распределения
         for i in range(3):
             ach_container.grid_columnconfigure(i, weight=1)
         
         achievements = [
-            ("🔥 Текущая серия", "5 дней"),
-            ("📚 Изучено сегодня", "12 слов"),
-            ("🎯 Всего изучено", "248 слов")
+            ("🔥 Текущая серия", f"{streak} дней", "Повторяйте слова каждый день!"),
+            ("📚 Изучено сегодня", f"{today_stats['cards_studied']} слов", "Сегодняшние успехи"),
+            ("🎯 Всего изучено", f"{total_studied_all_time} слов", "Общий прогресс")
         ]
         
-        for i, (title, value) in enumerate(achievements):
+        for i, (title, value, subtitle) in enumerate(achievements):
             frame = tk.Frame(ach_container, bg=Colors.BG_WHITE, relief=tk.RIDGE, bd=1)
             frame.grid(row=0, column=i, padx=10, sticky="nsew")
             
-            # Внутренние отступы
             tk.Label(
                 frame, 
                 text=title, 
@@ -133,35 +120,41 @@ class ProgressScreen(tk.Frame):
                 font=("Segoe UI", 20, "bold"),
                 bg=Colors.BG_WHITE, 
                 fg=Colors.PRIMARY
-            ).pack(pady=(5, 15))
+            ).pack(pady=(5, 5))
+            
+            tk.Label(
+                frame, 
+                text=subtitle, 
+                font=Fonts.SMALL,
+                bg=Colors.BG_WHITE, 
+                fg=Colors.TEXT_GRAY
+            ).pack(pady=(0, 15))
         
-        # Общая статистика
+        # ===== ОБЩАЯ СТАТИСТИКА =====
         stats_frame = tk.LabelFrame(
-            parent, 
+            self.scrollable_frame, 
             text="📈 Общая статистика", 
             font=Fonts.SUBTITLE, 
             bg=Colors.BG_WHITE, 
             fg=Colors.PRIMARY
         )
-        stats_frame.pack(fill=tk.BOTH, expand=True, padx=20, pady=10)
-        
-        # Контейнер для статистики с адаптивной сеткой
+        stats_frame.pack(fill=tk.X, padx=20, pady=10)
+
         stats_grid = tk.Frame(stats_frame, bg=Colors.BG_WHITE)
         stats_grid.pack(fill=tk.BOTH, expand=True, pady=20, padx=10)
-        
-        # Настройка весов для сетки (2x2)
+
         for i in range(2):
             stats_grid.grid_columnconfigure(i, weight=1)
         for i in range(2):
             stats_grid.grid_rowconfigure(i, weight=1)
-        
+
         stats_data = [
-            ("📋 Всего карточек", "420"),
-            ("✅ Изучено", "248"),
-            ("⏳ Осталось", "172"),
-            ("📊 Процент", "59%")
+            ("📋 Всего карточек", str(global_stats['total_cards'])),
+            ("✅ Изучено", str(global_stats['studied_cards'])),
+            ("⏳ Осталось", str(global_stats['remaining_cards'])),
+            ("📊 Процент", f"{global_stats['percent']}%")
         ]
-        
+
         for i, (label, value) in enumerate(stats_data):
             row = i // 2
             col = i % 2
@@ -184,9 +177,68 @@ class ProgressScreen(tk.Frame):
                 fg=Colors.SUCCESS
             ).pack(pady=(5, 15))
         
-        # Статистика за сегодня
+        # ===== ПРОГРЕСС ЗА ПЕРИОД (график) =====
+        period_frame = tk.LabelFrame(
+            self.scrollable_frame, 
+            text="📅 Прогресс за последние 7 дней", 
+            font=Fonts.SUBTITLE, 
+            bg=Colors.BG_WHITE, 
+            fg=Colors.PRIMARY
+        )
+        period_frame.pack(fill=tk.X, padx=20, pady=10)
+        
+        period_data = self.stats_repo.get_studied_cards_period(7)
+        
+        if period_data:
+            graph_frame = tk.Frame(period_frame, bg=Colors.BG_WHITE)
+            graph_frame.pack(pady=20, padx=20)
+            
+            max_value = max([count for _, count in period_data]) if period_data else 1
+            
+            for date_str, count in period_data:
+                date_obj = datetime.strptime(date_str, '%Y-%m-%d')
+                date_label = date_obj.strftime('%d.%m')
+                
+                bar_height = 30
+                bar_width = (count / max_value) * 300 if max_value > 0 else 0
+                
+                row_frame = tk.Frame(graph_frame, bg=Colors.BG_WHITE)
+                row_frame.pack(fill=tk.X, pady=5)
+                
+                tk.Label(
+                    row_frame, 
+                    text=date_label, 
+                    width=10, 
+                    anchor=tk.W,
+                    font=Fonts.SMALL,
+                    bg=Colors.BG_WHITE
+                ).pack(side=tk.LEFT)
+                
+                bar_canvas = tk.Canvas(row_frame, height=bar_height, width=350, bg=Colors.BG_WHITE, highlightthickness=0)
+                bar_canvas.pack(side=tk.LEFT, padx=10)
+                bar_canvas.create_rectangle(0, 0, bar_width, bar_height, fill=Colors.PRIMARY, tags="bar")
+                
+                tk.Label(
+                    row_frame, 
+                    text=str(count), 
+                    width=5,
+                    font=Fonts.SMALL,
+                    bg=Colors.BG_WHITE,
+                    fg=Colors.TEXT_GRAY
+                ).pack(side=tk.LEFT)
+        else:
+            tk.Label(
+                period_frame, 
+                text="Нет данных за последние 7 дней.\nПройдите тесты, чтобы увидеть прогресс!",
+                font=Fonts.BODY,
+                bg=Colors.BG_WHITE,
+                fg=Colors.TEXT_GRAY,
+                justify=tk.CENTER
+            ).pack(pady=30)
+        
+        # ===== СТАТИСТИКА ЗА СЕГОДНЯ =====
         daily_frame = tk.LabelFrame(
-            parent, 
+            self.scrollable_frame, 
             text="📅 Статистика за сегодня", 
             font=Fonts.SUBTITLE, 
             bg=Colors.BG_WHITE, 
@@ -197,14 +249,15 @@ class ProgressScreen(tk.Frame):
         daily_info = tk.Frame(daily_frame, bg=Colors.BG_WHITE)
         daily_info.pack(fill=tk.BOTH, expand=True, pady=20, padx=20)
         
-        # Настройка весов для колонок
         daily_info.grid_columnconfigure(0, weight=1)
         daily_info.grid_columnconfigure(1, weight=1)
         
+        correct_percent = today_stats['correct_percent']
+        
         daily_stats = [
-            ("🎴 Изучено карточек:", "12"),
-            ("✓ Правильных ответов:", "85%"),
-            ("⏱ Время изучения:", "25 мин")
+            ("🎴 Изучено карточек:", f"{today_stats['cards_studied']}"),
+            ("✓ Правильных ответов:", f"{correct_percent}%"),
+            ("⏱ Время изучения:", f"{today_stats['time_spent']} мин")
         ]
         
         for i, (label, value) in enumerate(daily_stats):
@@ -217,27 +270,46 @@ class ProgressScreen(tk.Frame):
                 anchor=tk.E
             ).grid(row=i, column=0, padx=20, pady=10, sticky="e")
             
+            # Цвет для процента правильных ответов
+            if "Правильных ответов" in label:
+                if correct_percent >= 80:
+                    color = Colors.SUCCESS
+                elif correct_percent >= 60:
+                    color = Colors.INFO
+                elif correct_percent >= 40:
+                    color = Colors.WARNING
+                else:
+                    color = Colors.ERROR
+            else:
+                color = Colors.SUCCESS
+            
             tk.Label(
                 daily_info, 
                 text=value, 
                 font=Fonts.BODY_BOLD, 
                 bg=Colors.BG_WHITE, 
-                fg=Colors.SUCCESS,
+                fg=color,
                 anchor=tk.W
             ).grid(row=i, column=1, padx=20, pady=10, sticky="w")
         
-        # Добавляем нижний отступ для красоты
-        bottom_spacer = tk.Frame(parent, height=20, bg=Colors.BG_LIGHT)
-        bottom_spacer.pack()
-        
-        # Сохраняем ссылки на фреймы для обновления
-        self.widgets_to_update = [
-            (achievements_frame, 40),
-            (stats_frame, 40),
-            (daily_frame, 40)
-        ]
+        # Нижний отступ
+        tk.Frame(self.scrollable_frame, height=20, bg=Colors.BG_LIGHT).pack()
     
-    def update_content_width(self):
-        """Обновление ширины контента"""
-        if hasattr(self, 'canvas') and self.canvas.winfo_width() > 0:
-            self.update_widgets_width(self.canvas.winfo_width())
+    def on_canvas_configure(self, event):
+        """Обновление ширины при изменении canvas"""
+        if event.width > 0 and hasattr(self, 'canvas'):
+            try:
+                self.canvas.itemconfig(1, width=event.width)
+            except:
+                pass
+
+    def refresh(self):
+        """Обновить данные на экране"""
+        # Принудительно обновляем репозиторий статистики
+        self.stats_repo.refresh()
+        # Перезагружаем данные
+        self.load_data()
+
+    def on_resize(self, event):
+        """Обновление при изменении размера"""
+        pass

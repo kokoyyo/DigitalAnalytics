@@ -93,8 +93,11 @@ class HomeScreen(tk.Frame):
         self.canvas.bind("<Configure>", self._on_canvas_configure)
     
     def _on_canvas_configure(self, event):
-        self.canvas.itemconfig(1, width=event.width)
-        self.update_deck_widths(event.width)
+        """Обновление ширины контента при изменении размера canvas"""
+        if event.width > 0:
+            self.canvas.itemconfig(1, width=event.width)
+            self.update_deck_widths(event.width)
+        
     
     def on_resize(self, event):
         if hasattr(self, 'canvas') and self.canvas.winfo_width() > 0:
@@ -268,7 +271,7 @@ class HomeScreen(tk.Frame):
         
         print(f"Создана кнопка для колоды: {deck.name} (ID: {deck_id})")
 
-
+    
     def open_deck(self, deck):
         """Открыть колоду"""
         print(f"open_deck ВЫЗВАН для колоды: {deck.name} (ID: {deck.id})")
@@ -294,6 +297,7 @@ class HomeScreen(tk.Frame):
             widget.destroy()
         
         print(f"Создаем DeckDetailScreen")
+        # Убираем третий аргумент main_app - передаем только parent и deck_id
         deck_screen = DeckDetailScreen(parent_container, deck.id)
         deck_screen.pack(fill=tk.BOTH, expand=True)
         print("DeckDetailScreen создан")
@@ -373,8 +377,44 @@ class HomeScreen(tk.Frame):
         tk.Button(btn_frame, text="Сохранить", command=save, bg=Colors.PRIMARY, fg=Colors.WHITE, padx=25, pady=5).pack(side=tk.LEFT, padx=5)
         tk.Button(btn_frame, text="Отмена", command=dialog.destroy, padx=25, pady=5).pack(side=tk.LEFT, padx=5)
     
+    def update_progress_screen_stats(self):
+        """Обновление статистики на экране прогресса"""
+        root = self.winfo_toplevel()
+        if hasattr(root, 'main_app'):
+            main_app = root.main_app
+            # Ищем экран прогресса и обновляем его
+            for widget in main_app.content_container.winfo_children():
+                if hasattr(widget, 'load_data'):
+                    widget.load_data()
+
     def delete_deck(self, deck):
+        """Удаление колоды"""
         if messagebox.askyesno("Подтверждение", f"Вы действительно хотите удалить колоду '{deck.name}'?\nВсе карточки будут также удалены!"):
             self.deck_repo.delete(deck.id)
             self.load_decks()
+            # Обновляем статистику на экране прогресса
+            self.refresh_progress_screen()
             messagebox.showinfo("Успех", f"Колода '{deck.name}' удалена")
+
+    def refresh_progress_screen(self):
+        """Обновление экрана прогресса"""
+        root = self.winfo_toplevel()
+        if hasattr(root, 'main_app'):
+            root.main_app.refresh_current_screen()
+
+    def refresh(self):
+        """Обновление главного экрана"""
+        self.load_decks()
+        self.update_statistics()
+
+
+    def refresh_all_stats(self):
+        """Обновление статистики на всех экранах"""
+        root = self.winfo_toplevel()
+        if hasattr(root, 'main_app'):
+            main_app = root.main_app
+            for widget in main_app.content_container.winfo_children():
+                if hasattr(widget, 'load_data'):
+                    widget.load_data()
+                if hasattr(widget, 'refresh'):
+                    widget.refresh()

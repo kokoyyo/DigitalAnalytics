@@ -7,7 +7,7 @@ import csv
 import os
 from datetime import datetime
 from presentation.gui.styles import Colors, Fonts
-from data.repositories import DeckRepository, CardRepository
+from data.repositories import DeckRepository, CardRepository, StatisticsRepository
 
 
 class SettingsScreen(tk.Frame):
@@ -18,6 +18,7 @@ class SettingsScreen(tk.Frame):
         self.parent = parent
         self.deck_repo = DeckRepository()
         self.card_repo = CardRepository()
+        self.stats_repo = StatisticsRepository()
         
         # Загружаем настройки
         self.settings = self.load_settings()
@@ -27,10 +28,7 @@ class SettingsScreen(tk.Frame):
     def load_settings(self):
         """Загрузка настроек из файла"""
         settings_file = "settings.json"
-        default_settings = {
-            "theme": "light",
-            "language": "ru"
-        }
+        default_settings = {"theme": "light"}
         
         if os.path.exists(settings_file):
             try:
@@ -52,37 +50,28 @@ class SettingsScreen(tk.Frame):
     
     def create_widgets(self):
         """Создание виджетов с прокруткой"""
-        # Создаем Canvas для прокрутки
-        self.canvas = tk.Canvas(self, bg=Colors.BG_LIGHT, highlightthickness=0)
-        scrollbar = ttk.Scrollbar(self, orient="vertical", command=self.canvas.yview)
+        # Canvas для прокрутки
+        canvas = tk.Canvas(self, bg=Colors.BG_LIGHT, highlightthickness=0)
+        scrollbar = ttk.Scrollbar(self, orient="vertical", command=canvas.yview)
+        scrollable_frame = tk.Frame(canvas, bg=Colors.BG_LIGHT)
         
-        # Создаем фрейм для содержимого внутри Canvas
-        self.scrollable_frame = tk.Frame(self.canvas, bg=Colors.BG_LIGHT)
-        self.scrollable_frame.bind(
+        scrollable_frame.bind(
             "<Configure>",
-            lambda e: self.canvas.configure(scrollregion=self.canvas.bbox("all"))
+            lambda e: canvas.configure(scrollregion=canvas.bbox("all"))
         )
+        canvas.create_window((0, 0), window=scrollable_frame, anchor="nw")
+        canvas.configure(yscrollcommand=scrollbar.set)
         
-        self.canvas.create_window((0, 0), window=self.scrollable_frame, anchor="nw")
-        self.canvas.configure(yscrollcommand=scrollbar.set)
-        
-        self.canvas.pack(side="left", fill="both", expand=True)
+        canvas.pack(side="left", fill="both", expand=True)
         scrollbar.pack(side="right", fill="y")
         
-        # Привязываем колесико мыши
         def _on_mousewheel(event):
-            self.canvas.yview_scroll(int(-1*(event.delta/120)), "units")
+            canvas.yview_scroll(int(-1*(event.delta/120)), "units")
         
-        self.canvas.bind("<MouseWheel>", _on_mousewheel)
-        self.scrollable_frame.bind("<MouseWheel>", _on_mousewheel)
+        canvas.bind("<MouseWheel>", _on_mousewheel)
         
-        # Создаем содержимое внутри скроллируемого фрейма
-        self.create_content(self.scrollable_frame)
-    
-    def create_content(self, parent):
-        """Создание содержимого экрана"""
         # Заголовок
-        header_frame = tk.Frame(parent, bg=Colors.BG_WHITE)
+        header_frame = tk.Frame(scrollable_frame, bg=Colors.BG_WHITE)
         header_frame.pack(fill=tk.X, padx=20, pady=20)
         
         tk.Label(
@@ -93,9 +82,9 @@ class SettingsScreen(tk.Frame):
             fg=Colors.TEXT_DARK
         ).pack(pady=20)
         
-        # Раздел "Настройка приложения"
+        # ===== НАСТРОЙКА ПРИЛОЖЕНИЯ =====
         app_frame = tk.LabelFrame(
-            parent, 
+            scrollable_frame, 
             text="🎨 Настройка приложения", 
             font=Fonts.SUBTITLE, 
             bg=Colors.BG_WHITE, 
@@ -103,7 +92,6 @@ class SettingsScreen(tk.Frame):
         )
         app_frame.pack(fill=tk.X, padx=20, pady=10)
         
-        # Выбор темы
         theme_frame = tk.Frame(app_frame, bg=Colors.BG_WHITE)
         theme_frame.pack(fill=tk.X, padx=20, pady=15)
         
@@ -148,9 +136,9 @@ class SettingsScreen(tk.Frame):
         )
         theme_info.pack(side=tk.LEFT, padx=15)
         
-        # Раздел "Управление данными"
+        # ===== УПРАВЛЕНИЕ ДАННЫМИ =====
         data_frame = tk.LabelFrame(
-            parent, 
+            scrollable_frame, 
             text="💾 Управление данными", 
             font=Fonts.SUBTITLE, 
             bg=Colors.BG_WHITE, 
@@ -158,24 +146,23 @@ class SettingsScreen(tk.Frame):
         )
         data_frame.pack(fill=tk.X, padx=20, pady=10)
         
+        # Статистика
         stats_frame = tk.Frame(data_frame, bg=Colors.BG_WHITE)
-        stats_frame.pack(pady=15, padx=20, fill=tk.X)
+        stats_frame.pack(pady=15, padx=20)
         
-        # Статистика данных
         decks_count = len(self.deck_repo.get_all())
         cards_count = 0
         for deck in self.deck_repo.get_all():
             cards_count += len(self.card_repo.get_by_deck(deck.id))
         
-        self.stats_text = f"📊 Текущие данные: {decks_count} колод, {cards_count} карточек"
         self.stats_label = tk.Label(
             stats_frame,
-            text=self.stats_text,
+            text=f"📊 Данные: {decks_count} колод, {cards_count} карточек",
             font=Fonts.BODY,
             bg=Colors.BG_WHITE,
             fg=Colors.TEXT_GRAY
         )
-        self.stats_label.pack(pady=(0, 15))
+        self.stats_label.pack()
         
         # Кнопки экспорта
         export_frame = tk.LabelFrame(data_frame, text="📤 Экспорт данных", font=Fonts.BODY, bg=Colors.BG_WHITE, fg=Colors.TEXT_DARK)
@@ -248,11 +235,8 @@ class SettingsScreen(tk.Frame):
         self.create_tooltip(import_csv_btn, "Импортировать данные из CSV файла")
         
         # Кнопка сброса
-        reset_frame = tk.Frame(data_frame, bg=Colors.BG_WHITE)
-        reset_frame.pack(pady=(10, 20))
-        
         reset_btn = tk.Button(
-            reset_frame,
+            data_frame,
             text="🗑️ Сбросить все данные",
             command=self.reset_all_data,
             bg=Colors.ERROR,
@@ -262,12 +246,12 @@ class SettingsScreen(tk.Frame):
             pady=8,
             cursor="hand2"
         )
-        reset_btn.pack()
+        reset_btn.pack(pady=(10, 15))
         self.create_tooltip(reset_btn, "Удалить все колоды и карточки (необратимое действие)")
         
-        # Раздел "О программе"
+        # ===== О ПРОГРАММЕ =====
         about_frame = tk.LabelFrame(
-            parent, 
+            scrollable_frame, 
             text="ℹ️ О программе", 
             font=Fonts.SUBTITLE, 
             bg=Colors.BG_WHITE, 
@@ -289,7 +273,7 @@ Flashcard English v1.0.0
 • Глобальный поиск по словам и переводам
 • Экспорт и импорт данных (JSON, CSV)
 
-© 2024 Все права защищены
+© 2026 Все права защищены
         """
         
         tk.Label(
@@ -301,8 +285,8 @@ Flashcard English v1.0.0
             justify=tk.LEFT
         ).pack(pady=20)
         
-        # Добавляем нижний отступ для красивого скроллинга
-        tk.Frame(parent, height=20, bg=Colors.BG_LIGHT).pack()
+        # Нижний отступ
+        tk.Frame(scrollable_frame, height=20, bg=Colors.BG_LIGHT).pack()
     
     def create_tooltip(self, widget, text):
         """Создание всплывающей подсказки"""
@@ -328,11 +312,35 @@ Flashcard English v1.0.0
         self.settings["theme"] = new_theme
         self.save_settings()
         
+        # Применяем тему
+        self.apply_theme(new_theme)
+        
         themes = {"light": "Светлая", "dark": "Темная"}
         messagebox.showinfo(
             "Настройки сохранены", 
             f"Тема '{themes[new_theme]}' выбрана.\nДля применения изменений перезапустите приложение."
         )
+    
+    def apply_theme(self, theme):
+        """Применение темы к интерфейсу"""
+        from presentation.gui.styles import Colors
+        
+        if theme == "dark":
+            Colors.BG_LIGHT = "#121212"
+            Colors.BG_WHITE = "#1E1E1E"
+            Colors.TEXT_DARK = "#FFFFFF"
+            Colors.TEXT_GRAY = "#B0B0B0"
+            Colors.BORDER = "#404040"
+        else:
+            Colors.BG_LIGHT = "#F5F5F5"
+            Colors.BG_WHITE = "#FFFFFF"
+            Colors.TEXT_DARK = "#212121"
+            Colors.TEXT_GRAY = "#757575"
+            Colors.BORDER = "#E0E0E0"
+        
+        # Обновляем фон главного окна
+        root = self.winfo_toplevel()
+        root.configure(bg=Colors.BG_LIGHT)
     
     def export_to_json(self):
         """Экспорт в JSON"""
@@ -347,14 +355,12 @@ Flashcard English v1.0.0
                 data = {
                     "export_date": datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
                     "version": "1.0",
-                    "format": "json",
                     "decks": []
                 }
                 
                 decks = self.deck_repo.get_all()
                 for deck in decks:
                     deck_data = {
-                        "id": deck.id,
                         "name": deck.name,
                         "description": deck.description,
                         "cards": []
@@ -399,7 +405,7 @@ Flashcard English v1.0.0
         
         if filename:
             try:
-                with open(filename, 'w', newline='', encoding='utf-8') as csvfile:
+                with open(filename, 'w', newline='', encoding='utf-8-sig') as csvfile:
                     writer = csv.writer(csvfile)
                     
                     writer.writerow(['Колода', 'Слово', 'Перевод', 'Транскрипция', 'Пример', 'Статус'])
@@ -431,7 +437,7 @@ Flashcard English v1.0.0
                 messagebox.showerror("Ошибка", f"Не удалось экспортировать данные:\n{str(e)}")
     
     def import_from_json(self):
-        """Импорт из JSON (добавление к существующим данным)"""
+        """Импорт из JSON"""
         filename = filedialog.askopenfilename(
             filetypes=[("JSON files", "*.json"), ("All files", "*.*")],
             title="Выберите JSON файл для импорта"
@@ -454,7 +460,7 @@ Flashcard English v1.0.0
                     f"Будут импортированы следующие данные:\n\n"
                     f"Колод: {decks_count}\n"
                     f"Карточек: {cards_count}\n\n"
-                    f"Новые данные будут ДОБАВЛЕНЫ к существующим.\n"
+                    f"Данные будут ДОБАВЛЕНЫ к существующим.\n"
                     f"Продолжить?"
                 ):
                     return
@@ -500,7 +506,7 @@ Flashcard English v1.0.0
                 messagebox.showerror("Ошибка", f"Не удалось импортировать данные:\n{str(e)}")
     
     def import_from_csv(self):
-        """Импорт из CSV (добавление к существующим данным)"""
+        """Импорт из CSV"""
         filename = filedialog.askopenfilename(
             filetypes=[("CSV files", "*.csv"), ("All files", "*.*")],
             title="Выберите CSV файл для импорта"
@@ -508,79 +514,141 @@ Flashcard English v1.0.0
         
         if filename:
             try:
-                with open(filename, 'r', encoding='utf-8') as csvfile:
-                    reader = csv.reader(csvfile)
-                    headers = next(reader)
+                # Пробуем разные кодировки
+                encodings = ['utf-8-sig', 'utf-8', 'cp1251', 'latin-1']
+                data = None
+                
+                for encoding in encodings:
+                    try:
+                        with open(filename, 'r', encoding=encoding) as csvfile:
+                            reader = csv.reader(csvfile)
+                            data = list(reader)
+                        print(f"Успешно прочитано с кодировкой: {encoding}")
+                        break
+                    except UnicodeDecodeError:
+                        continue
+                
+                if not data:
+                    messagebox.showerror("Ошибка", "Не удалось прочитать файл. Проверьте кодировку.")
+                    return
+                
+                if len(data) < 2:
+                    messagebox.showerror("Ошибка", "Файл не содержит данных!")
+                    return
+                
+                rows = data[1:]  # Пропускаем заголовки
+                
+                # Собираем данные по колодам
+                decks_data = {}
+                skipped_rows = 0
+                
+                for row_num, row in enumerate(rows, start=2):
+                    if len(row) < 6:
+                        skipped_rows += 1
+                        continue
                     
-                    decks_data = {}
+                    deck_name = row[0].strip()
+                    word = row[1].strip()
+                    translation = row[2].strip()
+                    transcription = row[3].strip() if len(row) > 3 else ""
+                    example = row[4].strip() if len(row) > 4 else ""
+                    status = row[5].strip() if len(row) > 5 else "Не изучено"
                     
-                    for row in reader:
-                        if len(row) >= 6:
-                            deck_name = row[0].strip()
-                            word = row[1].strip()
-                            translation = row[2].strip()
-                            transcription = row[3].strip() if len(row) > 3 else ""
-                            example = row[4].strip() if len(row) > 4 else ""
-                            status = row[5].strip() if len(row) > 5 else "Не изучено"
-                            
-                            if not deck_name or not word or not translation:
-                                continue
-                            
-                            if deck_name not in decks_data:
-                                decks_data[deck_name] = {'cards': []}
-                            
-                            decks_data[deck_name]['cards'].append({
-                                'word': word,
-                                'translation': translation,
-                                'transcription': transcription,
-                                'example': example,
-                                'status': 'studied' if status == 'Изучено' else 'not_studied'
-                            })
+                    if not deck_name or not word or not translation:
+                        skipped_rows += 1
+                        continue
                     
-                    if not decks_data:
-                        messagebox.showerror("Ошибка", "CSV файл не содержит данных!")
-                        return
+                    if deck_name not in decks_data:
+                        decks_data[deck_name] = {'cards': []}
                     
-                    total_decks = len(decks_data)
-                    total_cards = sum(len(data['cards']) for data in decks_data.values())
+                    # Проверяем на дубликаты в пределах одного импорта
+                    is_duplicate = False
+                    for existing_card in decks_data[deck_name]['cards']:
+                        if existing_card['word'].lower() == word.lower():
+                            is_duplicate = True
+                            break
                     
-                    if not messagebox.askyesno(
-                        "Подтверждение импорта",
-                        f"Будут импортированы следующие данные:\n\n"
-                        f"Колод: {total_decks}\n"
-                        f"Карточек: {total_cards}\n\n"
-                        f"Новые данные будут ДОБАВЛЕНЫ к существующим.\n"
-                        f"Продолжить?"
-                    ):
-                        return
+                    if not is_duplicate:
+                        decks_data[deck_name]['cards'].append({
+                            'word': word,
+                            'translation': translation,
+                            'transcription': transcription,
+                            'example': example,
+                            'status': 'studied' if status == 'Изучено' else 'not_studied'
+                        })
+                    else:
+                        skipped_rows += 1
+                
+                if not decks_data:
+                    messagebox.showerror("Ошибка", "CSV файл не содержит валидных данных!")
+                    return
+                
+                total_decks = len(decks_data)
+                total_cards = sum(len(data['cards']) for data in decks_data.values())
+                
+                if not messagebox.askyesno(
+                    "Подтверждение импорта",
+                    f"Будут импортированы следующие данные:\n\n"
+                    f"Колод: {total_decks}\n"
+                    f"Карточек: {total_cards}\n"
+                    f"Пропущено строк: {skipped_rows}\n\n"
+                    f"Данные будут ДОБАВЛЕНЫ к существующим.\n"
+                    f"Продолжить?"
+                ):
+                    return
+                
+                imported_decks = 0
+                imported_cards = 0
+                skipped_cards = 0
+                
+                for deck_name, deck_data in decks_data.items():
+                    # Проверяем, существует ли уже такая колода
+                    existing_decks = self.deck_repo.get_all()
+                    existing_deck = None
+                    for d in existing_decks:
+                        if d.name == deck_name:
+                            existing_deck = d
+                            break
                     
-                    imported_decks = 0
-                    imported_cards = 0
-                    
-                    for deck_name, deck_data in decks_data.items():
-                        new_deck = self.deck_repo.create(deck_name, "")
+                    if existing_deck:
+                        current_deck = existing_deck
                         imported_decks += 1
+                    else:
+                        current_deck = self.deck_repo.create(deck_name, "")
+                        imported_decks += 1
+                    
+                    for card_data in deck_data['cards']:
+                        # Проверяем, нет ли уже такой карточки в БД
+                        existing_cards = self.card_repo.get_by_deck(current_deck.id)
+                        word_exists = False
+                        for c in existing_cards:
+                            if c.word.lower() == card_data['word'].lower():
+                                word_exists = True
+                                break
                         
-                        for card_data in deck_data['cards']:
+                        if not word_exists:
                             self.card_repo.create(
-                                new_deck.id,
+                                current_deck.id,
                                 card_data['word'],
                                 card_data['translation'],
                                 card_data['example'],
                                 card_data['transcription']
                             )
                             imported_cards += 1
-                    
-                    messagebox.showinfo(
-                        "Импорт завершен", 
-                        f"Данные успешно импортированы из CSV!\n\n"
-                        f"Добавлено колод: {imported_decks}\n"
-                        f"Добавлено карточек: {imported_cards}\n"
-                        f"Файл: {os.path.basename(filename)}"
-                    )
-                    
-                    self.refresh_stats()
-                    self.update_main_screen()
+                        else:
+                            skipped_cards += 1
+                
+                messagebox.showinfo(
+                    "Импорт завершен", 
+                    f"Данные успешно импортированы из CSV!\n\n"
+                    f"Добавлено колод: {imported_decks}\n"
+                    f"Добавлено карточек: {imported_cards}\n"
+                    f"Пропущено дубликатов: {skipped_cards}\n"
+                    f"Файл: {os.path.basename(filename)}"
+                )
+                
+                self.refresh_stats()
+                self.update_main_screen()
                 
             except Exception as e:
                 messagebox.showerror("Ошибка", f"Не удалось импортировать данные:\n{str(e)}")
@@ -592,9 +660,7 @@ Flashcard English v1.0.0
         for deck in self.deck_repo.get_all():
             cards_count += len(self.card_repo.get_by_deck(deck.id))
         
-        self.stats_text = f"📊 Текущие данные: {decks_count} колод, {cards_count} карточек"
-        if hasattr(self, 'stats_label') and self.stats_label:
-            self.stats_label.config(text=self.stats_text)
+        self.stats_label.config(text=f"📊 Данные: {decks_count} колод, {cards_count} карточек")
     
     def reset_all_data(self):
         """Сброс всех данных"""
@@ -617,10 +683,24 @@ Flashcard English v1.0.0
             except Exception as e:
                 messagebox.showerror("Ошибка", f"Не удалось удалить данные:\n{str(e)}")
     
+    def refresh_all_screens(self):
+        """Принудительное обновление всех экранов"""
+        root = self.winfo_toplevel()
+        if hasattr(root, 'main_app'):
+            main_app = root.main_app
+            
+            # Принудительно обновляем статистику в репозитории
+            self.stats_repo.refresh()
+            
+            # Обновляем главный экран
+            main_app.show_home_screen()
+            
+            # Обновляем текущий экран настроек
+            self.refresh_stats()
+    
     def update_main_screen(self):
         """Обновление главного экрана"""
         root = self.winfo_toplevel()
         if hasattr(root, 'main_app'):
             main_app = root.main_app
-            if hasattr(main_app, 'current_frame') and hasattr(main_app.current_frame, 'load_decks'):
-                main_app.current_frame.load_decks()
+            main_app.show_home_screen()

@@ -11,33 +11,29 @@ class DeckDetailScreen(tk.Frame):
     
     def __init__(self, parent, deck_id):
         super().__init__(parent, bg=Colors.BG_LIGHT)
+        self.parent = parent
         self.deck_id = deck_id
         self.deck_repo = DeckRepository()
         self.card_repo = CardRepository()
         self.deck = self.deck_repo.get_by_id(deck_id)
         self.current_filter = "all"
         self.cards = []
+        self.card_frames = []
         
         self.create_widgets()
         self.load_cards()
-        
-        # Привязываем событие изменения размера
         self.bind("<Configure>", self.on_resize)
     
     def on_resize(self, event):
         """Обновление при изменении размера"""
         if hasattr(self, 'empty_label') and self.empty_label:
-            # Центрируем сообщение об отсутствии карточек
             self.center_empty_message()
     
     def center_empty_message(self):
         """Центрирование сообщения об отсутствии карточек"""
         if hasattr(self, 'empty_label') and self.empty_label:
-            # Получаем размеры контейнера
             container_width = self.cards_container.winfo_width()
             container_height = self.cards_container.winfo_height()
-            
-            # Центрируем метку
             self.empty_label.place(relx=0.5, rely=0.5, anchor="center")
     
     def create_widgets(self):
@@ -153,7 +149,6 @@ class DeckDetailScreen(tk.Frame):
         canvas.pack(side="left", fill="both", expand=True, padx=10, pady=10)
         scrollbar.pack(side="right", fill="y")
         
-        # Привязываем колесико мыши
         def _on_mousewheel(event):
             canvas.yview_scroll(int(-1*(event.delta/120)), "units")
         
@@ -161,6 +156,7 @@ class DeckDetailScreen(tk.Frame):
         self.cards_container.bind("<MouseWheel>", _on_mousewheel)
         
         self.canvas = canvas
+        canvas.bind("<Configure>", self.on_canvas_configure)
         
         # Кнопка добавления карточки
         add_btn = tk.Button(
@@ -192,20 +188,17 @@ class DeckDetailScreen(tk.Frame):
             
             widget.tooltip = tooltip
             widget.bind("<Leave>", lambda e: hide_tooltip())
-        
+
         widget.bind("<Enter>", show_tooltip)
     
     def load_cards(self):
         """Загрузка карточек с фильтром"""
-        # Очищаем контейнер
         for widget in self.cards_container.winfo_children():
             widget.destroy()
         
-        # Получаем карточки с фильтром
         self.cards = self.card_repo.get_by_deck(self.deck_id, self.current_filter)
         
         if not self.cards:
-            # Создаем центрированное сообщение
             self.empty_label = tk.Label(
                 self.cards_container,
                 text="📭 Нет карточек в этой колоде.\n\nНажмите кнопку '+ Добавить карточку'\nчтобы создать первую карточку",
@@ -222,19 +215,16 @@ class DeckDetailScreen(tk.Frame):
     
     def create_card_item(self, card):
         """Создание элемента карточки"""
-        # Карточка карточки
         card_frame = tk.Frame(self.cards_container, bg=Colors.BG_WHITE, relief=tk.RIDGE, bd=1)
         card_frame.pack(fill=tk.X, pady=5, padx=5)
         
-        # Внутренний контейнер
         inner_frame = tk.Frame(card_frame, bg=Colors.BG_WHITE)
         inner_frame.pack(fill=tk.X, padx=15, pady=10)
         
-        # Верхняя строка: слово и перевод
+        # Слово и перевод
         word_frame = tk.Frame(inner_frame, bg=Colors.BG_WHITE)
         word_frame.pack(fill=tk.X, pady=(0, 5))
         
-        # Слово
         word_label = tk.Label(
             word_frame, 
             text=card.word, 
@@ -244,7 +234,6 @@ class DeckDetailScreen(tk.Frame):
         )
         word_label.pack(side=tk.LEFT)
         
-        # Перевод - убираем дефис, делаем красивое оформление
         translation_text = f"→ {card.translation}"
         trans_label = tk.Label(
             word_frame, 
@@ -255,7 +244,7 @@ class DeckDetailScreen(tk.Frame):
         )
         trans_label.pack(side=tk.LEFT, padx=(10, 0))
         
-        # Индикатор статуса справа
+        # Статус
         status_icon = "✅" if card.status == "studied" else "⭕"
         status_text = "Изучено" if card.status == "studied" else "Не изучено"
         
@@ -280,7 +269,7 @@ class DeckDetailScreen(tk.Frame):
         )
         status_text_label.pack(side=tk.LEFT, padx=(5, 0))
         
-        # Дополнительная информация
+        # Транскрипция
         if card.transcription:
             transcr_label = tk.Label(
                 inner_frame,
@@ -291,6 +280,7 @@ class DeckDetailScreen(tk.Frame):
             )
             transcr_label.pack(anchor=tk.W, pady=(0, 3))
         
+        # Пример
         if card.example:
             example_label = tk.Label(
                 inner_frame,
@@ -303,16 +293,13 @@ class DeckDetailScreen(tk.Frame):
             )
             example_label.pack(anchor=tk.W)
         
-        # Нижняя панель с кнопками действий
+        # Кнопки действий
         actions_frame = tk.Frame(inner_frame, bg=Colors.BG_WHITE)
         actions_frame.pack(fill=tk.X, pady=(10, 0))
         
-        # Разделитель
         separator = tk.Frame(actions_frame, bg=Colors.BORDER, height=1)
         separator.pack(fill=tk.X, pady=(0, 8))
         
-        # Кнопки с подписями
-        # Кнопка изменения статуса
         status_btn_text = "✅ Отметить изученным" if card.status == "not_studied" else "🔄 Отметить неизученным"
         status_btn = tk.Button(
             actions_frame,
@@ -327,9 +314,7 @@ class DeckDetailScreen(tk.Frame):
             command=lambda: self.toggle_status(card)
         )
         status_btn.pack(side=tk.LEFT, padx=(0, 10))
-        self.create_tooltip(status_btn, "Изменить статус изучения карточки")
         
-        # Кнопка редактирования
         edit_btn = tk.Button(
             actions_frame,
             text="✏️ Редактировать",
@@ -343,9 +328,7 @@ class DeckDetailScreen(tk.Frame):
             command=lambda: self.edit_card(card)
         )
         edit_btn.pack(side=tk.LEFT, padx=(0, 10))
-        self.create_tooltip(edit_btn, "Редактировать слово, перевод, транскрипцию и пример")
         
-        # Кнопка удаления
         delete_btn = tk.Button(
             actions_frame,
             text="🗑️ Удалить",
@@ -359,32 +342,15 @@ class DeckDetailScreen(tk.Frame):
             command=lambda: self.delete_card(card)
         )
         delete_btn.pack(side=tk.LEFT)
-        self.create_tooltip(delete_btn, "Удалить карточку из колоды")
     
     def apply_filter(self):
-        """Применение фильтра"""
         self.current_filter = self.filter_var.get()
         self.load_cards()
     
     def toggle_status(self, card):
-        """Изменение статуса карточки"""
         new_status = "studied" if card.status == "not_studied" else "not_studied"
         self.card_repo.update_status(card.id, new_status)
         self.load_cards()
-        # Обновляем прогресс на главном экране при возврате
-        self.update_main_screen_stats()
-    
-    def update_main_screen_stats(self):
-        """Обновление статистики на главном экране"""
-        # Находим главный экран и обновляем его
-        root = self.winfo_toplevel()
-        for widget in root.winfo_children():
-            if hasattr(widget, 'content_container'):
-                for child in widget.content_container.winfo_children():
-                    if hasattr(child, 'update_statistics'):
-                        child.update_statistics()
-                        child.load_decks()
-                        break
     
     def add_card(self):
         """Добавление карточки"""
@@ -395,13 +361,11 @@ class DeckDetailScreen(tk.Frame):
         dialog.transient(self)
         dialog.grab_set()
         
-        # Центрируем окно
         dialog.update_idletasks()
         x = (dialog.winfo_screenwidth() // 2) - (550 // 2)
         y = (dialog.winfo_screenheight() // 2) - (600 // 2)
         dialog.geometry(f"550x600+{x}+{y}")
         
-        # Поля ввода
         tk.Label(dialog, text="Слово (на английском):", font=Fonts.BODY).pack(pady=(20, 5), padx=20, anchor=tk.W)
         word_entry = tk.Entry(dialog, font=Fonts.BODY, width=50)
         word_entry.pack(padx=20, pady=5, fill=tk.X)
@@ -432,13 +396,12 @@ class DeckDetailScreen(tk.Frame):
                 self.card_repo.create(self.deck_id, word, translation, example, transcription)
                 dialog.destroy()
                 self.load_cards()
-                self.update_main_screen_stats()
                 messagebox.showinfo("Успех", "Карточка добавлена!")
             else:
                 messagebox.showwarning("Внимание", "Заполните слово и перевод!")
         
         tk.Button(btn_frame, text="Сохранить", command=save, bg=Colors.PRIMARY, fg=Colors.WHITE, padx=25, pady=5).pack(side=tk.LEFT, padx=5)
-        tk.Button(btn_frame, text="Отмена", command=dialog.destroy, padx=25, pady=5).pack(side=tk.LEFT, padx=5)
+        tk.Button(btn_frame, text="Отмена", command=dialog.destroy, bg=Colors.TEXT_GRAY, fg=Colors.WHITE, padx=25, pady=5).pack(side=tk.LEFT, padx=5)
     
     def edit_card(self, card):
         """Редактирование карточки"""
@@ -449,7 +412,6 @@ class DeckDetailScreen(tk.Frame):
         dialog.transient(self)
         dialog.grab_set()
         
-        # Центрируем окно
         dialog.update_idletasks()
         x = (dialog.winfo_screenwidth() // 2) - (550 // 2)
         y = (dialog.winfo_screenheight() // 2) - (600 // 2)
@@ -487,7 +449,7 @@ class DeckDetailScreen(tk.Frame):
                 example = example_text.get("1.0", tk.END).strip()
                 
                 self.card_repo.update(card.id, word=word, translation=translation, 
-                                     transcription=transcription, example=example)
+                                    transcription=transcription, example=example)
                 dialog.destroy()
                 self.load_cards()
                 messagebox.showinfo("Успех", "Карточка обновлена!")
@@ -495,15 +457,50 @@ class DeckDetailScreen(tk.Frame):
                 messagebox.showwarning("Внимание", "Заполните слово и перевод!")
         
         tk.Button(btn_frame, text="Сохранить", command=save, bg=Colors.PRIMARY, fg=Colors.WHITE, padx=25, pady=5).pack(side=tk.LEFT, padx=5)
-        tk.Button(btn_frame, text="Отмена", command=dialog.destroy, padx=25, pady=5).pack(side=tk.LEFT, padx=5)
+        tk.Button(btn_frame, text="Отмена", command=dialog.destroy, bg=Colors.TEXT_GRAY, fg=Colors.WHITE, padx=25, pady=5).pack(side=tk.LEFT, padx=5)
     
     def delete_card(self, card):
         """Удаление карточки"""
         if messagebox.askyesno("Подтверждение", f"Удалить карточку '{card.word}'?"):
             self.card_repo.delete(card.id)
             self.load_cards()
-            self.update_main_screen_stats()
+            # Принудительно обновляем статистику
+            self.force_refresh_statistics()
             messagebox.showinfo("Успех", "Карточка удалена")
+
+    def force_refresh_statistics(self):
+        """Принудительное обновление статистики во всех экранах"""
+        root = self.winfo_toplevel()
+        if hasattr(root, 'main_app'):
+            main_app = root.main_app
+            
+            # Очищаем кэш репозиториев
+            from data.repositories import StatisticsRepository, DeckRepository, CardRepository
+            stats_repo = StatisticsRepository()
+            stats_repo.refresh()
+            
+            # Обновляем все экраны
+            for widget in main_app.content_container.winfo_children():
+                if hasattr(widget, 'refresh'):
+                    widget.refresh()
+                elif hasattr(widget, 'load_data'):
+                    widget.load_data()
+                elif hasattr(widget, 'load_decks'):
+                    widget.load_decks()
+
+    def refresh_all_stats(self):
+        """Обновление статистики на всех экранах"""
+        root = self.winfo_toplevel()
+        if hasattr(root, 'main_app'):
+            main_app = root.main_app
+            # Обновляем главный экран
+            for widget in main_app.content_container.winfo_children():
+                if hasattr(widget, 'load_decks'):
+                    widget.load_decks()
+                if hasattr(widget, 'load_data'):
+                    widget.load_data()
+                if hasattr(widget, 'refresh'):
+                    widget.refresh()
     
     def edit_deck(self):
         """Редактирование колоды"""
@@ -514,7 +511,6 @@ class DeckDetailScreen(tk.Frame):
         dialog.transient(self)
         dialog.grab_set()
         
-        # Центрируем окно
         dialog.update_idletasks()
         x = (dialog.winfo_screenwidth() // 2) - (450 // 2)
         y = (dialog.winfo_screenheight() // 2) - (350 // 2)
@@ -542,29 +538,46 @@ class DeckDetailScreen(tk.Frame):
                 self.name_label.config(text=self.deck.name)
                 dialog.destroy()
                 messagebox.showinfo("Успех", f"Колода '{name}' обновлена!")
-                self.update_main_screen_stats()
             else:
                 messagebox.showwarning("Внимание", "Введите название колоды")
         
         tk.Button(btn_frame, text="Сохранить", command=save, bg=Colors.PRIMARY, fg=Colors.WHITE, padx=25, pady=5).pack(side=tk.LEFT, padx=5)
-        tk.Button(btn_frame, text="Отмена", command=dialog.destroy, padx=25, pady=5).pack(side=tk.LEFT, padx=5)
+        tk.Button(btn_frame, text="Отмена", command=dialog.destroy, bg=Colors.TEXT_GRAY, fg=Colors.WHITE, padx=25, pady=5).pack(side=tk.LEFT, padx=5)
+    
     
     def delete_deck(self):
         """Удаление колоды"""
         if messagebox.askyesno("Подтверждение", f"Удалить колоду '{self.deck.name}'?\nВсе карточки будут также удалены!"):
             self.deck_repo.delete(self.deck_id)
             self.go_back()
+            # Обновляем статистику на экране прогресса
+            self.refresh_progress_screen()
             messagebox.showinfo("Успех", "Колода удалена")
-    
+
+    def refresh_progress_screen(self):
+        """Обновление экрана прогресса"""
+        root = self.winfo_toplevel()
+        if hasattr(root, 'main_app'):
+            main_app = root.main_app
+            for widget in main_app.content_container.winfo_children():
+                if hasattr(widget, 'load_data'):
+                    widget.load_data()
+
+
     def start_test(self):
         """Начать тестирование"""
-        messagebox.showinfo("Тест", "Режим тестирования будет добавлен в следующей версии")
-    
-    def go_back(self):
-        """Вернуться к списку колод"""
-        from presentation.gui.screens.home_screen import HomeScreen
+        from presentation.gui.screens.test_screen import TestScreen
         
-        # Ищем content_container вверх по иерархии
+        cards = self.card_repo.get_by_deck(self.deck_id)
+        if len(cards) < 4:
+            messagebox.showwarning(
+                "Недостаточно карточек", 
+                f"В колоде '{self.deck.name}' недостаточно карточек для тестирования.\n"
+                f"Требуется минимум 4 карточки.\n"
+                f"Сейчас в колоде: {len(cards)} карточек."
+            )
+            return
+        
         current = self
         parent_container = None
         while current:
@@ -574,13 +587,35 @@ class DeckDetailScreen(tk.Frame):
             current = current.master
         
         if not parent_container:
-            # Если не нашли, используем непосредственного родителя
             parent_container = self.master
         
-        # Очищаем текущий контент
         for widget in parent_container.winfo_children():
             widget.destroy()
         
-        # Создаем главный экран
+        test_screen = TestScreen(parent_container, self.deck_id, self.deck.name)
+        test_screen.pack(fill=tk.BOTH, expand=True)
+    
+    def on_canvas_configure(self, event):
+        if event.width > 0:
+            self.canvas.itemconfig(1, width=event.width)
+    
+    def go_back(self):
+        """Вернуться к списку колод"""
+        from presentation.gui.screens.home_screen import HomeScreen
+        
+        current = self
+        parent_container = None
+        while current:
+            if hasattr(current, 'content_container'):
+                parent_container = current.content_container
+                break
+            current = current.master
+        
+        if not parent_container:
+            parent_container = self.master
+        
+        for widget in parent_container.winfo_children():
+            widget.destroy()
+        
         home_screen = HomeScreen(parent_container)
         home_screen.pack(fill=tk.BOTH, expand=True)
