@@ -48,263 +48,185 @@ class SettingsScreen(tk.Frame):
         except:
             return False
     
+    # ── вспомогательные методы вёрстки ───────────────────────────────────────
+
+    def _section(self, parent, icon, title, accent):
+        """Карточка-секция с цветным акцентом слева."""
+        outer = tk.Frame(parent, bg=Colors.BG_WHITE, relief=tk.FLAT, bd=0)
+        outer.pack(fill=tk.X, padx=20, pady=8)
+
+        # тонкая цветная полоска
+        tk.Frame(outer, bg=accent, width=4).pack(side=tk.LEFT, fill=tk.Y)
+
+        body = tk.Frame(outer, bg=Colors.BG_WHITE)
+        body.pack(side=tk.LEFT, fill=tk.BOTH, expand=True)
+
+        # заголовок секции
+        hdr = tk.Frame(body, bg=accent)
+        hdr.pack(fill=tk.X)
+        tk.Label(hdr, text=f"  {icon}  {title}", font=Fonts.BODY_BOLD,
+                 bg=accent, fg=Colors.WHITE, pady=8).pack(side=tk.LEFT)
+
+        content = tk.Frame(body, bg=Colors.BG_WHITE)
+        content.pack(fill=tk.BOTH, padx=16, pady=14)
+        return content
+
+    def _btn(self, parent, text, command, color, tooltip_text=None):
+        """Кнопка без мерцания (activebackground = bg)."""
+        btn = tk.Button(
+            parent, text=text, command=command,
+            bg=color, activebackground=color,
+            fg=Colors.WHITE, activeforeground=Colors.WHITE,
+            font=Fonts.BUTTON, relief=tk.FLAT,
+            padx=18, pady=7, cursor="hand2",
+            bd=0, highlightthickness=0,
+        )
+        if tooltip_text:
+            self.create_tooltip(btn, tooltip_text)
+        return btn
+
+    # ── основной метод ────────────────────────────────────────────────────────
+
     def create_widgets(self):
-        """Создание виджетов с прокруткой"""
-        # Canvas для прокрутки
+        """Создание виджетов"""
+        NAV_BG = "#1565C0"
+
+        # ── Canvas + скролл ──────────────────────────────────────────────────
         canvas = tk.Canvas(self, bg=Colors.BG_LIGHT, highlightthickness=0)
         scrollbar = ttk.Scrollbar(self, orient="vertical", command=canvas.yview)
-        scrollable_frame = tk.Frame(canvas, bg=Colors.BG_LIGHT)
-        
-        scrollable_frame.bind(
-            "<Configure>",
-            lambda e: canvas.configure(scrollregion=canvas.bbox("all"))
-        )
-        canvas.create_window((0, 0), window=scrollable_frame, anchor="nw")
+        sf = tk.Frame(canvas, bg=Colors.BG_LIGHT)   # scrollable_frame
+        sf.bind("<Configure>", lambda e: canvas.configure(scrollregion=canvas.bbox("all")))
+        self._sf_win = canvas.create_window((0, 0), window=sf, anchor="nw")
         canvas.configure(yscrollcommand=scrollbar.set)
-        
+        canvas.bind("<Configure>", lambda e: canvas.itemconfig(
+            self._sf_win, width=e.width))
+        canvas.bind("<MouseWheel>", lambda e: canvas.yview_scroll(
+            int(-1 * (e.delta // 120)), "units"))
         canvas.pack(side="left", fill="both", expand=True)
         scrollbar.pack(side="right", fill="y")
-        
-        def _on_mousewheel(event):
-            canvas.yview_scroll(int(-1*(event.delta/120)), "units")
-        
-        canvas.bind("<MouseWheel>", _on_mousewheel)
-        
-        # Заголовок
-        header_frame = tk.Frame(scrollable_frame, bg=Colors.BG_WHITE)
-        header_frame.pack(fill=tk.X, padx=20, pady=20)
-        
-        tk.Label(
-            header_frame,
-            text="⚙️ Настройки",
-            font=Fonts.TITLE,
-            bg=Colors.BG_WHITE,
-            fg=Colors.TEXT_DARK
-        ).pack(pady=20)
-        
-        # ===== НАСТРОЙКА ПРИЛОЖЕНИЯ =====
-        app_frame = tk.LabelFrame(
-            scrollable_frame, 
-            text="🎨 Настройка приложения", 
-            font=Fonts.SUBTITLE, 
-            bg=Colors.BG_WHITE, 
-            fg=Colors.PRIMARY
-        )
-        app_frame.pack(fill=tk.X, padx=20, pady=10)
-        
-        theme_frame = tk.Frame(app_frame, bg=Colors.BG_WHITE)
-        theme_frame.pack(fill=tk.X, padx=20, pady=15)
-        
-        tk.Label(
-            theme_frame, 
-            text="Тема оформления:", 
-            font=Fonts.BODY, 
-            bg=Colors.BG_WHITE, 
-            fg=Colors.TEXT_DARK
-        ).pack(side=tk.LEFT, padx=(0, 20))
-        
+
+        # ── Шапка (синяя, как навбар) ─────────────────────────────────────────
+        header = tk.Frame(sf, bg=NAV_BG)
+        header.pack(fill=tk.X)
+        tk.Label(header, text="⚙️  Настройки", font=("Segoe UI", 20, "bold"),
+                 bg=NAV_BG, fg="#FFFFFF", pady=20).pack(side=tk.LEFT, padx=28)
+
+        # ── Секция: Оформление ────────────────────────────────────────────────
+        sec1 = self._section(sf, "🎨", "Оформление", Colors.PRIMARY)
+
+        tk.Label(sec1, text="Тема интерфейса:", font=Fonts.BODY,
+                 bg=Colors.BG_WHITE, fg=Colors.TEXT_DARK).pack(anchor=tk.W)
+
+        radio_row = tk.Frame(sec1, bg=Colors.BG_WHITE)
+        radio_row.pack(anchor=tk.W, pady=(6, 0))
+
         self.theme_var = tk.StringVar(value=self.settings.get("theme", "light"))
-        
-        light_radio = tk.Radiobutton(
-            theme_frame, 
-            text="Светлая", 
-            variable=self.theme_var, 
-            value="light", 
-            bg=Colors.BG_WHITE, 
-            font=Fonts.BODY,
-            command=self.change_theme
-        )
-        light_radio.pack(side=tk.LEFT, padx=10)
-        
-        dark_radio = tk.Radiobutton(
-            theme_frame, 
-            text="Темная", 
-            variable=self.theme_var, 
-            value="dark", 
-            bg=Colors.BG_WHITE, 
-            font=Fonts.BODY,
-            command=self.change_theme
-        )
-        dark_radio.pack(side=tk.LEFT, padx=10)
-        
-        theme_info = tk.Label(
-            theme_frame,
-            text="(для применения изменений перезапустите приложение)",
-            font=Fonts.SMALL,
-            bg=Colors.BG_WHITE,
-            fg=Colors.TEXT_GRAY
-        )
-        theme_info.pack(side=tk.LEFT, padx=15)
-        
-        # ===== УПРАВЛЕНИЕ ДАННЫМИ =====
-        data_frame = tk.LabelFrame(
-            scrollable_frame, 
-            text="💾 Управление данными", 
-            font=Fonts.SUBTITLE, 
-            bg=Colors.BG_WHITE, 
-            fg=Colors.PRIMARY
-        )
-        data_frame.pack(fill=tk.X, padx=20, pady=10)
-        
-        # Статистика
-        stats_frame = tk.Frame(data_frame, bg=Colors.BG_WHITE)
-        stats_frame.pack(pady=15, padx=20)
-        
+        for label, val in [("☀️  Светлая", "light"), ("🌙  Тёмная", "dark")]:
+            tk.Radiobutton(radio_row, text=label, variable=self.theme_var,
+                           value=val, bg=Colors.BG_WHITE, fg=Colors.TEXT_DARK,
+                           selectcolor=Colors.BG_WHITE, activebackground=Colors.BG_WHITE,
+                           font=Fonts.BODY, command=self.change_theme
+                           ).pack(side=tk.LEFT, padx=(0, 20))
+
+        tk.Label(sec1, text="Перезапустите приложение для применения темы",
+                 font=Fonts.SMALL, bg=Colors.BG_WHITE, fg=Colors.TEXT_GRAY
+                 ).pack(anchor=tk.W, pady=(4, 0))
+
+        # ── Секция: Данные ────────────────────────────────────────────────────
+        sec2 = self._section(sf, "💾", "Управление данными", "#1976D2")
+
+        # мини-статистика
         decks_count = len(self.deck_repo.get_all())
-        cards_count = 0
-        for deck in self.deck_repo.get_all():
-            cards_count += len(self.card_repo.get_by_deck(deck.id))
-        
+        cards_count = sum(len(self.card_repo.get_by_deck(d.id))
+                          for d in self.deck_repo.get_all())
+        stat_row = tk.Frame(sec2, bg="#EEF4FF", bd=0)
+        stat_row.pack(fill=tk.X, pady=(0, 14))
         self.stats_label = tk.Label(
-            stats_frame,
-            text=f"📊 Данные: {decks_count} колод, {cards_count} карточек",
-            font=Fonts.BODY,
-            bg=Colors.BG_WHITE,
-            fg=Colors.TEXT_GRAY
-        )
-        self.stats_label.pack()
-        
-        # Кнопки экспорта
-        export_frame = tk.LabelFrame(data_frame, text="📤 Экспорт данных", font=Fonts.BODY, bg=Colors.BG_WHITE, fg=Colors.TEXT_DARK)
-        export_frame.pack(fill=tk.X, padx=20, pady=10)
-        
-        export_btn_frame = tk.Frame(export_frame, bg=Colors.BG_WHITE)
-        export_btn_frame.pack(pady=15)
-        
-        export_json_btn = tk.Button(
-            export_btn_frame,
-            text="📄 Экспорт в JSON",
-            command=self.export_to_json,
-            bg=Colors.INFO,
-            fg=Colors.WHITE,
-            font=Fonts.BUTTON,
-            padx=20,
-            pady=8,
-            cursor="hand2"
-        )
-        export_json_btn.pack(side=tk.LEFT, padx=10)
-        self.create_tooltip(export_json_btn, "Экспортировать все данные в JSON файл")
-        
-        export_csv_btn = tk.Button(
-            export_btn_frame,
-            text="📊 Экспорт в CSV",
-            command=self.export_to_csv,
-            bg=Colors.SUCCESS,
-            fg=Colors.WHITE,
-            font=Fonts.BUTTON,
-            padx=20,
-            pady=8,
-            cursor="hand2"
-        )
-        export_csv_btn.pack(side=tk.LEFT, padx=10)
-        self.create_tooltip(export_csv_btn, "Экспортировать все данные в CSV файл")
-        
-        # Кнопки импорта
-        import_frame = tk.LabelFrame(data_frame, text="📥 Импорт данных", font=Fonts.BODY, bg=Colors.BG_WHITE, fg=Colors.TEXT_DARK)
-        import_frame.pack(fill=tk.X, padx=20, pady=10)
-        
-        import_btn_frame = tk.Frame(import_frame, bg=Colors.BG_WHITE)
-        import_btn_frame.pack(pady=15)
-        
-        import_json_btn = tk.Button(
-            import_btn_frame,
-            text="📄 Импорт из JSON",
-            command=self.import_from_json,
-            bg=Colors.PRIMARY,
-            fg=Colors.WHITE,
-            font=Fonts.BUTTON,
-            padx=20,
-            pady=8,
-            cursor="hand2"
-        )
-        import_json_btn.pack(side=tk.LEFT, padx=10)
-        self.create_tooltip(import_json_btn, "Импортировать данные из JSON файла")
-        
-        import_csv_btn = tk.Button(
-            import_btn_frame,
-            text="📊 Импорт из CSV",
-            command=self.import_from_csv,
-            bg=Colors.SECONDARY,
-            fg=Colors.WHITE,
-            font=Fonts.BUTTON,
-            padx=20,
-            pady=8,
-            cursor="hand2"
-        )
-        import_csv_btn.pack(side=tk.LEFT, padx=10)
-        self.create_tooltip(import_csv_btn, "Импортировать данные из CSV файла")
-        
-        # Кнопка сброса
-        reset_btn = tk.Button(
-            data_frame,
-            text="🗑️ Сбросить все данные",
-            command=self.reset_all_data,
-            bg=Colors.ERROR,
-            fg=Colors.WHITE,
-            font=Fonts.BUTTON,
-            padx=20,
-            pady=8,
-            cursor="hand2"
-        )
-        reset_btn.pack(pady=(10, 15))
-        self.create_tooltip(reset_btn, "Удалить все колоды и карточки (необратимое действие)")
-        
-        # ===== О ПРОГРАММЕ =====
-        about_frame = tk.LabelFrame(
-            scrollable_frame, 
-            text="ℹ️ О программе", 
-            font=Fonts.SUBTITLE, 
-            bg=Colors.BG_WHITE, 
-            fg=Colors.PRIMARY
-        )
-        about_frame.pack(fill=tk.X, padx=20, pady=10)
-        
-        about_text = """
-Flashcard English v1.0.0
+            stat_row,
+            text=f"  📋  {decks_count} колод   ·   {cards_count} карточек",
+            font=Fonts.BODY, bg="#EEF4FF", fg=Colors.PRIMARY, pady=8, anchor=tk.W)
+        self.stats_label.pack(fill=tk.X)
 
-Приложение для изучения английского языка по методу флеш-карточек
-Разработано с использованием Python и Tkinter
+        # экспорт
+        tk.Label(sec2, text="Экспорт", font=Fonts.BODY_BOLD,
+                 bg=Colors.BG_WHITE, fg=Colors.TEXT_GRAY).pack(anchor=tk.W)
+        exp_row = tk.Frame(sec2, bg=Colors.BG_WHITE)
+        exp_row.pack(anchor=tk.W, pady=(6, 14))
+        self._btn(exp_row, "📄  JSON", self.export_to_json,
+                  Colors.INFO, "Экспортировать все данные в JSON").pack(side=tk.LEFT, padx=(0, 10))
+        self._btn(exp_row, "📊  CSV",  self.export_to_csv,
+                  Colors.SUCCESS, "Экспортировать все данные в CSV").pack(side=tk.LEFT)
 
-Функции:
-• Создание и управление колодами карточек
-• Добавление карточек со словом, переводом, транскрипцией и примером
-• Тестирование с множественным выбором
-• Отслеживание прогресса и достижений
-• Глобальный поиск по словам и переводам
-• Экспорт и импорт данных (JSON, CSV)
+        # импорт
+        tk.Label(sec2, text="Импорт", font=Fonts.BODY_BOLD,
+                 bg=Colors.BG_WHITE, fg=Colors.TEXT_GRAY).pack(anchor=tk.W)
+        imp_row = tk.Frame(sec2, bg=Colors.BG_WHITE)
+        imp_row.pack(anchor=tk.W, pady=(6, 14))
+        self._btn(imp_row, "📄  JSON", self.import_from_json,
+                  Colors.PRIMARY, "Импортировать данные из JSON").pack(side=tk.LEFT, padx=(0, 10))
+        self._btn(imp_row, "📊  CSV",  self.import_from_csv,
+                  Colors.SECONDARY, "Импортировать данные из CSV").pack(side=tk.LEFT)
 
-© 2026 Все права защищены
-        """
-        
-        tk.Label(
-            about_frame, 
-            text=about_text, 
-            font=Fonts.BODY, 
-            bg=Colors.BG_WHITE, 
-            fg=Colors.TEXT_GRAY, 
-            justify=tk.LEFT
-        ).pack(pady=20)
-        
-        # Нижний отступ
-        tk.Frame(scrollable_frame, height=20, bg=Colors.BG_LIGHT).pack()
+        # разделитель
+        tk.Frame(sec2, bg=Colors.BORDER, height=1).pack(fill=tk.X, pady=(4, 14))
+
+        self._btn(sec2, "🗑️  Сбросить все данные", self.reset_all_data,
+                  Colors.ERROR, "Удалить все колоды и карточки (необратимо)"
+                  ).pack(anchor=tk.W)
+
+        # ── Секция: О программе ───────────────────────────────────────────────
+        sec3 = self._section(sf, "ℹ️", "О программе", "#546E7A")
+
+        about_items = [
+            ("Flashcard English", "v1.0.0", Colors.PRIMARY),
+            ("Язык", "Python + Tkinter", Colors.TEXT_GRAY),
+            ("Возможности", "колоды · карточки · тесты · прогресс · поиск · импорт/экспорт",
+             Colors.TEXT_GRAY),
+            ("", "© 2026  Все права защищены", Colors.TEXT_GRAY),
+        ]
+        for label, value, color in about_items:
+            row = tk.Frame(sec3, bg=Colors.BG_WHITE)
+            row.pack(fill=tk.X, pady=2)
+            if label:
+                tk.Label(row, text=f"{label}:", font=Fonts.BODY_BOLD, width=14,
+                         bg=Colors.BG_WHITE, fg=Colors.TEXT_DARK, anchor=tk.W).pack(side=tk.LEFT)
+            tk.Label(row, text=value, font=Fonts.BODY,
+                     bg=Colors.BG_WHITE, fg=color, anchor=tk.W,
+                     wraplength=600, justify=tk.LEFT).pack(side=tk.LEFT)
+
+        tk.Frame(sf, height=24, bg=Colors.BG_LIGHT).pack()
     
     def create_tooltip(self, widget, text):
         """Создание всплывающей подсказки"""
+        tip_ref = [None]
+        after_id = [None]
+
         def show_tooltip(event):
-            tooltip = tk.Toplevel(widget)
-            tooltip.wm_overrideredirect(True)
-            tooltip.wm_geometry(f"+{event.x_root+10}+{event.y_root+10}")
-            
-            label = tk.Label(tooltip, text=text, background="#FFFFE0", relief="solid", borderwidth=1, font=("Segoe UI", 9))
-            label.pack()
-            
-            def hide_tooltip():
-                tooltip.destroy()
-            
-            widget.tooltip = tooltip
-            widget.bind("<Leave>", lambda e: hide_tooltip())
-        
+            if after_id[0]:
+                widget.after_cancel(after_id[0])
+
+            def _create():
+                if tip_ref[0] is not None:
+                    return
+                tip = tk.Toplevel(widget)
+                tip.wm_overrideredirect(True)
+                tip.wm_geometry(f"+{event.x_root + 15}+{event.y_root + 15}")
+                tk.Label(tip, text=text, background="#FFFFE0", relief="solid",
+                         borderwidth=1, font=("Segoe UI", 9)).pack()
+                tip_ref[0] = tip
+
+            after_id[0] = widget.after(600, _create)
+
+        def hide_tooltip(event=None):
+            if after_id[0]:
+                widget.after_cancel(after_id[0])
+                after_id[0] = None
+            if tip_ref[0] is not None:
+                tip_ref[0].destroy()
+                tip_ref[0] = None
+
         widget.bind("<Enter>", show_tooltip)
+        widget.bind("<Leave>", hide_tooltip)
     
     def change_theme(self):
         """Изменение темы оформления"""

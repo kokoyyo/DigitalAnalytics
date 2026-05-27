@@ -64,9 +64,6 @@ class ProgressScreen(tk.Frame):
         global_stats = self.stats_repo.get_global_stats()
         total_studied_all_time = global_stats['studied_cards']
         
-        # Отладка
-        print(f"ProgressScreen: Всего карточек={global_stats['total_cards']}, Изучено={global_stats['studied_cards']}")
-        
         # Заголовок
         header_frame = tk.Frame(self.scrollable_frame, bg=Colors.BG_WHITE)
         header_frame.pack(fill=tk.X, padx=20, pady=20)

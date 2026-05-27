@@ -13,6 +13,7 @@ def get_db_connection():
     """Получить соединение с БД"""
     conn = sqlite3.connect(DB_PATH)
     conn.row_factory = sqlite3.Row
+    conn.execute("PRAGMA foreign_keys = ON")
     return conn
 
 
@@ -309,7 +310,18 @@ class CardRepository:
     
     def update_status(self, card_id, status):
         """Обновить статус карточки"""
-        return self.update(card_id, status=status)
+        conn = get_db_connection()
+        cursor = conn.cursor()
+        if status == 'studied':
+            cursor.execute(
+                'UPDATE cards SET status = ?, last_reviewed_at = CURRENT_TIMESTAMP WHERE id = ?',
+                (status, card_id)
+            )
+        else:
+            cursor.execute('UPDATE cards SET status = ? WHERE id = ?', (status, card_id))
+        conn.commit()
+        conn.close()
+        self._clear_cache()
     
     def mark_deck_cards_as_studied(self, deck_id):
         """Отметить все карточки колоды как изученные"""
@@ -370,8 +382,8 @@ class StatisticsRepository:
                 correct_answers = correct_answers + ?,
                 total_answers = total_answers + ?,
                 time_spent = time_spent + ?
-        ''', (today, correct_answers, correct_answers, total_answers, time_spent,
-              correct_answers, correct_answers, total_answers, time_spent))
+        ''', (today, total_answers, correct_answers, total_answers, time_spent,
+              total_answers, correct_answers, total_answers, time_spent))
         
         conn.commit()
         conn.close()
@@ -409,10 +421,10 @@ class StatisticsRepository:
         conn = get_db_connection()
         cursor = conn.cursor()
         
-        cursor.execute("SELECT COUNT(*) FROM cards WHERE status = 'studied'")
+        cursor.execute("SELECT COUNT(*) FROM cards WHERE status = 'studied' AND deck_id IN (SELECT id FROM decks)")
         result = cursor.fetchone()
         conn.close()
-        
+
         return result[0] if result else 0
     
     def get_studied_cards_period(self, days=7):
@@ -438,30 +450,40 @@ class StatisticsRepository:
         conn = get_db_connection()
         cursor = conn.cursor()
         today = date.today().isoformat()
-        
+
+        # Считаем уникальные карточки, отмеченные как изученные сегодня
+        cursor.execute(
+            "SELECT COUNT(*) FROM cards "
+            "WHERE status = 'studied' AND DATE(last_reviewed_at) = ? "
+            "AND deck_id IN (SELECT id FROM decks)",
+            (today,)
+        )
+        cards_studied = cursor.fetchone()[0]
+
+        # Процент правильных ответов и время — из daily_stats (заполняются тестами)
         cursor.execute('SELECT * FROM daily_stats WHERE stat_date = ?', (today,))
         result = cursor.fetchone()
         conn.close()
-        
+
         if result:
             correct_percent = (result['correct_answers'] / result['total_answers'] * 100) if result['total_answers'] > 0 else 0
             return {
-                'cards_studied': result['cards_studied'],
+                'cards_studied': cards_studied,
                 'correct_percent': round(correct_percent, 1),
                 'time_spent': result['time_spent']
             }
-        return {'cards_studied': 0, 'correct_percent': 0, 'time_spent': 0}
+        return {'cards_studied': cards_studied, 'correct_percent': 0, 'time_spent': 0}
     
     def get_global_stats(self):
         """Получить глобальную статистику (без кэширования)"""
         conn = get_db_connection()
         cursor = conn.cursor()
         
-        cursor.execute("SELECT COUNT(*) FROM cards")
+        cursor.execute("SELECT COUNT(*) FROM cards WHERE deck_id IN (SELECT id FROM decks)")
         result = cursor.fetchone()
         total_cards = result[0] if result else 0
-        
-        cursor.execute("SELECT COUNT(*) FROM cards WHERE status = 'studied'")
+
+        cursor.execute("SELECT COUNT(*) FROM cards WHERE status = 'studied' AND deck_id IN (SELECT id FROM decks)")
         result = cursor.fetchone()
         studied_cards = result[0] if result else 0
         

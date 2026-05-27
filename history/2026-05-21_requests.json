@@ -1,0 +1,114 @@
+[
+  {
+    "id": 1,
+    "date": "2026-05-21",
+    "question": "сделай чтобы открывающееся окно не мигала при перемещении мыши и не тормозило",
+    "answer": "Исправлен grid layout корневого окна в main_window.py. Убрали лишние вызовы overrideredirect. Добавили grid_rowconfigure(weight=1) для корректного растягивания.",
+    "files": ["presentation/gui/main_window.py"]
+  },
+  {
+    "id": 2,
+    "date": "2026-05-21",
+    "question": "все еще мигает экран / мигает окно с моими каталогами",
+    "answer": "В home_screen.py заменили контейнер карточек с tk.Button на tk.Frame с ручными биндингами. Исправили ID окна canvas. Добавили after_idle(update_idletasks) для перерисовки при прокрутке.",
+    "files": ["presentation/gui/screens/home_screen.py"]
+  },
+  {
+    "id": 3,
+    "date": "2026-05-21",
+    "question": "переделай вкладку мои колоды, чтобы она не мигала и при листании страницы не исчезали названия колод",
+    "answer": "Полный рефакторинг карточек: tk.Frame вместо tk.Button, правильный canvas window ID, mousewheel через event.delta // 120, принудительная перерисовка.",
+    "files": ["presentation/gui/screens/home_screen.py"]
+  },
+  {
+    "id": 4,
+    "date": "2026-05-21",
+    "question": "во вкладке прогресс сделай чтобы статистика правильно считалась",
+    "answer": "Добавили PRAGMA foreign_keys = ON. Исправили get_global_stats() и get_total_studied_cards() — фильтр deck_id IN (SELECT id FROM decks). Исправили update_daily_stats(): cards_studied = total_answers.",
+    "files": ["data/repositories.py"]
+  },
+  {
+    "id": 5,
+    "date": "2026-05-21",
+    "question": "почему всего карточек 20?",
+    "answer": "Обнаружены 5 осиротевших карточек от удалённой колоды (foreign keys были отключены). Удалили вручную, включили PRAGMA foreign_keys = ON постоянно.",
+    "files": ["data/repositories.py", "flashcard.db"]
+  },
+  {
+    "id": 6,
+    "date": "2026-05-21",
+    "question": "счетчик изучено сегодня работает некорректно",
+    "answer": "В update_status() добавили запись last_reviewed_at = CURRENT_TIMESTAMP при статусе studied. get_today_stats() переписан: считает из cards по DATE(last_reviewed_at) = today.",
+    "files": ["data/repositories.py"]
+  },
+  {
+    "id": 7,
+    "date": "2026-05-21",
+    "question": "поиск работает не правильно",
+    "answer": "Убрали дублирующий биндинг KeyRelease. Добавили дебаунс 250 мс. Добавили _open_deck() и _make_clickable() — результаты стали кликабельными.",
+    "files": ["presentation/gui/screens/search_screen.py"]
+  },
+  {
+    "id": 8,
+    "date": "2026-05-21",
+    "question": "почему по первой букве ищется не так как надо",
+    "answer": "word_match изменён с in (подстрока) на startswith (префикс). trans_match ограничен минимум 2 символами. Добавлен _word_starts() — ищет с начала каждого слова.",
+    "files": ["presentation/gui/screens/search_screen.py"]
+  },
+  {
+    "id": 9,
+    "date": "2026-05-21",
+    "question": "ищет буквы не сначала — би находило хобби, Кол находило школа",
+    "answer": "Поиск по именам колод и переводам переведён на _word_starts(): разбивает текст на слова и проверяет startswith для каждого.",
+    "files": ["presentation/gui/screens/search_screen.py"]
+  },
+  {
+    "id": 10,
+    "date": "2026-05-21",
+    "question": "сделай пользовательское меню размером с окно, чтобы выглядело красиво",
+    "answer": "Полный редизайн навигации: tk.Frame-вкладки с иконкой + текстом + белым индикатором. Цвета: фон #1565C0, hover #1769AA, активная #1976D2. Методы _nav_select, _nav_hover, _nav_set_active.",
+    "files": ["presentation/gui/main_window.py"]
+  },
+  {
+    "id": 11,
+    "date": "2026-05-21",
+    "question": "а где вкладки другие?",
+    "answer": "После первой попытки использовали place() — не работает до расчёта геометрии. Переделали на pack(), все 4 вкладки появились корректно.",
+    "files": ["presentation/gui/main_window.py"]
+  },
+  {
+    "id": 12,
+    "date": "2026-05-21",
+    "question": "сделай вкладку настроек в таком же стиле",
+    "answer": "Редизайн settings_screen.py: синяя шапка #1565C0, белые секции с цветной левой полосой, кнопки с activebackground. Методы _section() и _btn(). Canvas с автоподстройкой ширины.",
+    "files": ["presentation/gui/screens/settings_screen.py"]
+  },
+  {
+    "id": 13,
+    "date": "2026-05-21",
+    "question": "добавь еще 5 колод каких-нибудь",
+    "answer": "Добавлены колоды: Travel English, Business English, Academic English, Technology & IT, Everyday Phrases.",
+    "files": ["flashcard.db"]
+  },
+  {
+    "id": 14,
+    "date": "2026-05-21",
+    "question": "еще добавь 10 колод по 10 карточек",
+    "answer": "Добавлены 10 колод x 10 карточек: Цвета и формы, Дом и мебель, Транспорт, Работа и профессии, Спорт и хобби, Здоровье и тело, Семья и люди, Погода и сезоны, Город и места, Бизнес и деньги. Итого: 17 колод, 150 карточек.",
+    "files": ["flashcard.db"]
+  },
+  {
+    "id": 15,
+    "date": "2026-05-21",
+    "question": "проверь поиск на корректность",
+    "answer": "Найдены 2 бага: trans_match без минимальной длины (шумные результаты по 1 букве); _make_clickable дублировал прямых детей. Оба исправлены.",
+    "files": ["presentation/gui/screens/search_screen.py"]
+  },
+  {
+    "id": 16,
+    "date": "2026-05-21",
+    "question": "сделай папку с историей запросов / мне нужна история запросов из claude code в отдельной папке",
+    "answer": "Создана папка history/ в c:/Users/Mi/Work/english/. Сохранены 2026-05-21_session.md и 2026-05-21_requests.json.",
+    "files": ["history/2026-05-21_session.md", "history/2026-05-21_requests.json"]
+  }
+]

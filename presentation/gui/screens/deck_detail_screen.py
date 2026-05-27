@@ -175,21 +175,35 @@ class DeckDetailScreen(tk.Frame):
     
     def create_tooltip(self, widget, text):
         """Создание всплывающей подсказки"""
+        tip_ref = [None]
+        after_id = [None]
+
         def show_tooltip(event):
-            tooltip = tk.Toplevel(widget)
-            tooltip.wm_overrideredirect(True)
-            tooltip.wm_geometry(f"+{event.x_root+10}+{event.y_root+10}")
-            
-            label = tk.Label(tooltip, text=text, background="#FFFFE0", relief="solid", borderwidth=1, font=("Segoe UI", 9))
-            label.pack()
-            
-            def hide_tooltip():
-                tooltip.destroy()
-            
-            widget.tooltip = tooltip
-            widget.bind("<Leave>", lambda e: hide_tooltip())
+            if after_id[0]:
+                widget.after_cancel(after_id[0])
+
+            def _create():
+                if tip_ref[0] is not None:
+                    return
+                tip = tk.Toplevel(widget)
+                tip.wm_overrideredirect(True)
+                tip.wm_geometry(f"+{event.x_root + 15}+{event.y_root + 15}")
+                tk.Label(tip, text=text, background="#FFFFE0", relief="solid",
+                         borderwidth=1, font=("Segoe UI", 9)).pack()
+                tip_ref[0] = tip
+
+            after_id[0] = widget.after(600, _create)
+
+        def hide_tooltip(event=None):
+            if after_id[0]:
+                widget.after_cancel(after_id[0])
+                after_id[0] = None
+            if tip_ref[0] is not None:
+                tip_ref[0].destroy()
+                tip_ref[0] = None
 
         widget.bind("<Enter>", show_tooltip)
+        widget.bind("<Leave>", hide_tooltip)
     
     def load_cards(self):
         """Загрузка карточек с фильтром"""

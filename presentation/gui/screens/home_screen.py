@@ -71,23 +71,24 @@ class HomeScreen(tk.Frame):
         
         self.canvas = tk.Canvas(canvas_container, bg=Colors.BG_LIGHT, highlightthickness=0)
         scrollbar = ttk.Scrollbar(canvas_container, orient="vertical", command=self.canvas.yview)
-        
+
         self.decks_frame = tk.Frame(self.canvas, bg=Colors.BG_LIGHT)
         self.decks_frame.bind(
             "<Configure>",
             lambda e: self.canvas.configure(scrollregion=self.canvas.bbox("all"))
         )
-        
-        self.canvas.create_window((0, 0), window=self.decks_frame, anchor="nw")
+
+        self._decks_window_id = self.canvas.create_window((0, 0), window=self.decks_frame, anchor="nw")
         self.canvas.configure(yscrollcommand=scrollbar.set)
-        
+
         self.canvas.pack(side="left", fill="both", expand=True)
         scrollbar.pack(side="right", fill="y")
-        
-        # Привязываем колесико мыши
+
         def _on_mousewheel(event):
-            self.canvas.yview_scroll(int(-1*(event.delta/120)), "units")
-        
+            self.canvas.yview_scroll(int(-1 * (event.delta // 120)), "units")
+            # Форсируем перерисовку — фикс бага tkinter на Windows (исчезающий текст при скролле)
+            self.canvas.after_idle(self.canvas.update_idletasks)
+
         self.canvas.bind("<MouseWheel>", _on_mousewheel)
         self.decks_frame.bind("<MouseWheel>", _on_mousewheel)
         self.canvas.bind("<Configure>", self._on_canvas_configure)
@@ -95,7 +96,7 @@ class HomeScreen(tk.Frame):
     def _on_canvas_configure(self, event):
         """Обновление ширины контента при изменении размера canvas"""
         if event.width > 0:
-            self.canvas.itemconfig(1, width=event.width)
+            self.canvas.itemconfig(self._decks_window_id, width=event.width)
             self.update_deck_widths(event.width)
         
     
@@ -167,33 +168,27 @@ class HomeScreen(tk.Frame):
         total_cards = len(cards)
         studied_cards = sum(1 for c in cards if c.status == 'studied')
         progress = (studied_cards / total_cards * 100) if total_cards > 0 else 0
-        
+
         current_width = self.canvas.winfo_width() if hasattr(self, 'canvas') and self.canvas.winfo_width() > 0 else 800
-        
-        # Сохраняем ID колоды для использования в lambda
         deck_id = deck.id
-        deck_name = deck.name
-        
-        # СОЗДАЕМ КНОПКУ - используем фиксированное значение через default аргумент
-        card_btn = tk.Button(
+
+        # Frame вместо Button — нет системного hover-перерисования, нет мигания
+        card_frame = tk.Frame(
             self.decks_frame,
             bg=Colors.BG_WHITE,
             relief=tk.RAISED,
             bd=2,
-            cursor="hand2",
-            command=lambda d_id=deck_id: self.open_deck_by_id(d_id)  # Передаем ID, а не объект
+            cursor="hand2"
         )
-        card_btn.pack(fill=tk.X, pady=10, padx=5)
-        
-        self.deck_frames.append(card_btn)
-        
-        inner_frame = tk.Frame(card_btn, bg=Colors.BG_WHITE)
+        card_frame.pack(fill=tk.X, pady=10, padx=5)
+        self.deck_frames.append(card_frame)
+
+        inner_frame = tk.Frame(card_frame, bg=Colors.BG_WHITE, cursor="hand2")
         inner_frame.pack(fill=tk.BOTH, expand=True, padx=15, pady=12)
-        
-        # Верхняя строка
-        top_frame = tk.Frame(inner_frame, bg=Colors.BG_WHITE)
+
+        top_frame = tk.Frame(inner_frame, bg=Colors.BG_WHITE, cursor="hand2")
         top_frame.pack(fill=tk.X, pady=(0, 8))
-        
+
         name_label = tk.Label(
             top_frame,
             text=deck.name,
@@ -203,22 +198,24 @@ class HomeScreen(tk.Frame):
             cursor="hand2"
         )
         name_label.pack(side=tk.LEFT)
-        # Для Label тоже используем ID
-        name_label.bind("<Button-1>", lambda e, d_id=deck_id: self.open_deck_by_id(d_id))
-        
+
         menu_btn = tk.Button(
             top_frame,
             text="⋮",
             font=("Segoe UI", 16),
             bg=Colors.BG_WHITE,
+            activebackground=Colors.BG_WHITE,
             fg=Colors.TEXT_GRAY,
             relief=tk.FLAT,
+            bd=0,
+            highlightthickness=0,
             cursor="hand2",
             command=lambda d=deck: self.show_context_menu(d)
         )
         menu_btn.pack(side=tk.RIGHT)
-        
+
         # Описание
+        desc_label = None
         if deck.description:
             desc_label = tk.Label(
                 inner_frame,
@@ -227,38 +224,38 @@ class HomeScreen(tk.Frame):
                 bg=Colors.BG_WHITE,
                 fg=Colors.TEXT_GRAY,
                 wraplength=current_width - 80,
-                justify=tk.LEFT
+                justify=tk.LEFT,
+                cursor="hand2"
             )
             desc_label.pack(anchor=tk.W, pady=(0, 10))
-            card_btn.desc_label = desc_label
-        
-        # Статистика
-        stats_progress_frame = tk.Frame(inner_frame, bg=Colors.BG_WHITE)
+            card_frame.desc_label = desc_label
+
+        stats_progress_frame = tk.Frame(inner_frame, bg=Colors.BG_WHITE, cursor="hand2")
         stats_progress_frame.pack(fill=tk.X, pady=(0, 5))
-        
-        stats_text = f"📝 {total_cards} карточек  |  ✅ {studied_cards} изучено"
+
         stats_label = tk.Label(
             stats_progress_frame,
-            text=stats_text,
+            text=f"📝 {total_cards} карточек  |  ✅ {studied_cards} изучено",
             font=("Segoe UI", 10),
             bg=Colors.BG_WHITE,
-            fg=Colors.TEXT_GRAY
+            fg=Colors.TEXT_GRAY,
+            cursor="hand2"
         )
         stats_label.pack(side=tk.LEFT)
-        
+
         percent_label = tk.Label(
             stats_progress_frame,
             text=f"{progress:.0f}%",
             font=("Segoe UI", 11, "bold"),
             bg=Colors.BG_WHITE,
-            fg=Colors.SUCCESS
+            fg=Colors.SUCCESS,
+            cursor="hand2"
         )
         percent_label.pack(side=tk.RIGHT)
-        
-        # Прогресс-бар
+
         progress_frame = tk.Frame(inner_frame, bg=Colors.BG_WHITE)
         progress_frame.pack(fill=tk.X)
-        
+
         progress_bar = ttk.Progressbar(
             progress_frame,
             style="Success.Horizontal.TProgressbar",
@@ -266,10 +263,33 @@ class HomeScreen(tk.Frame):
             value=progress
         )
         progress_bar.pack(fill=tk.X, expand=True)
-        
-        card_btn.current_width = current_width
-        
-        print(f"Создана кнопка для колоды: {deck.name} (ID: {deck_id})")
+
+        # Виджеты, на которые вешаем клик и hover (menu_btn исключён — у него свой обработчик)
+        clickable = [card_frame, inner_frame, top_frame, name_label,
+                     stats_progress_frame, stats_label, percent_label, progress_frame]
+        if desc_label:
+            clickable.append(desc_label)
+
+        hover_bg_widgets = [w for w in clickable
+                            if isinstance(w, (tk.Frame, tk.Label))]
+
+        def open_deck(event=None):
+            self.open_deck_by_id(deck_id)
+
+        def on_enter(event=None):
+            card_frame.config(relief=tk.RIDGE)
+            for w in hover_bg_widgets:
+                w.config(bg=Colors.HOVER)
+
+        def on_leave(event=None):
+            card_frame.config(relief=tk.RAISED)
+            for w in hover_bg_widgets:
+                w.config(bg=Colors.BG_WHITE)
+
+        for w in clickable:
+            w.bind("<Button-1>", open_deck)
+            w.bind("<Enter>", on_enter)
+            w.bind("<Leave>", on_leave)
 
     
     def open_deck(self, deck):
