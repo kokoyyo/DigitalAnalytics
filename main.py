@@ -21,6 +21,7 @@ def main():
     
     app = MainApplication(root)
     root.mainloop()
+    
 
 
 if __name__ == "__main__":

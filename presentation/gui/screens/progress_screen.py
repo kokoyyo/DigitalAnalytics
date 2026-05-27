@@ -23,6 +23,21 @@ class ProgressScreen(tk.Frame):
         # Привязываем событие изменения размера
         self.bind("<Configure>", self.on_resize)
     
+    def format_time(self, minutes):
+        """Форматирование времени в минуты и секунды"""
+        if minutes <= 0:
+            return "0 мин"
+        
+        mins = int(minutes)
+        secs = int((minutes - mins) * 60)
+        
+        if mins > 0 and secs > 0:
+            return f"{mins} мин {secs} сек"
+        elif mins > 0:
+            return f"{mins} мин"
+        else:
+            return f"{secs} сек"
+    
     def create_widgets(self):
         """Создание виджетов с прокруткой"""
         # Создаем Canvas для прокрутки
@@ -43,11 +58,37 @@ class ProgressScreen(tk.Frame):
         self.canvas = canvas
         scrollbar.pack(side="right", fill="y")
         
-        def _on_mousewheel(event):
-            canvas.yview_scroll(int(-1*(event.delta/120)), "units")
-        
-        canvas.bind("<MouseWheel>", _on_mousewheel)
-        self.scrollable_frame.bind("<MouseWheel>", _on_mousewheel)
+        # Универсальный обработчик скролла
+        self._mousewheel_handler = self._make_mousewheel_handler()
+        self._bind_mousewheel(canvas)
+        self._bind_mousewheel(self.scrollable_frame)
+    
+    def _make_mousewheel_handler(self):
+        """Возвращает плавный обработчик скролла колесиком"""
+        def handler(event):
+            if hasattr(event, 'delta') and event.delta != 0:
+                delta = -1 * (event.delta // 30)
+            elif event.num == 4:
+                delta = -3
+            elif event.num == 5:
+                delta = 3
+            else:
+                return
+            
+            current_pos = self.canvas.yview()[0]
+            new_pos = current_pos + (delta / 100)
+            new_pos = max(0, min(1, new_pos))
+            self.canvas.yview_moveto(new_pos)
+            self.canvas.update_idletasks()
+        return handler
+
+    def _bind_mousewheel(self, widget):
+        """Привязывает скролл к виджету и всем его дочерним элементам рекурсивно"""
+        widget.bind("<MouseWheel>", self._mousewheel_handler, add="+")
+        widget.bind("<Button-4>", self._mousewheel_handler, add="+")
+        widget.bind("<Button-5>", self._mousewheel_handler, add="+")
+        for child in widget.winfo_children():
+            self._bind_mousewheel(child)
     
     def load_data(self):
         """Загрузка всех данных с принудительным обновлением"""
@@ -242,21 +283,37 @@ class ProgressScreen(tk.Frame):
             fg=Colors.PRIMARY
         )
         daily_frame.pack(fill=tk.X, padx=20, pady=10)
-        
+
         daily_info = tk.Frame(daily_frame, bg=Colors.BG_WHITE)
         daily_info.pack(fill=tk.BOTH, expand=True, pady=20, padx=20)
-        
+
         daily_info.grid_columnconfigure(0, weight=1)
         daily_info.grid_columnconfigure(1, weight=1)
-        
+
         correct_percent = today_stats['correct_percent']
-        
+        time_spent_minutes = today_stats.get('time_spent_minutes', today_stats['time_spent'])
+
+        # Форматируем время
+        if time_spent_minutes >= 60:
+            hours = int(time_spent_minutes // 60)
+            mins = int(time_spent_minutes % 60)
+            time_str = f"{hours} ч {mins} мин"
+        elif time_spent_minutes > 0:
+            mins = int(time_spent_minutes)
+            secs = int((time_spent_minutes - mins) * 60)
+            if secs > 0:
+                time_str = f"{mins} мин {secs} сек"
+            else:
+                time_str = f"{mins} мин"
+        else:
+            time_str = "0 мин"
+
         daily_stats = [
             ("🎴 Изучено карточек:", f"{today_stats['cards_studied']}"),
             ("✓ Правильных ответов:", f"{correct_percent}%"),
-            ("⏱ Время изучения:", f"{today_stats['time_spent']} мин")
+            ("⏱ Время изучения:", time_str)
         ]
-        
+
         for i, (label, value) in enumerate(daily_stats):
             tk.Label(
                 daily_info, 
@@ -288,6 +345,9 @@ class ProgressScreen(tk.Frame):
                 fg=color,
                 anchor=tk.W
             ).grid(row=i, column=1, padx=20, pady=10, sticky="w")
+        
+        # Привязываем скролл ко всем созданным виджетам
+        self._bind_mousewheel(self.scrollable_frame)
         
         # Нижний отступ
         tk.Frame(self.scrollable_frame, height=20, bg=Colors.BG_LIGHT).pack()

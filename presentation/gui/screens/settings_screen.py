@@ -85,6 +85,33 @@ class SettingsScreen(tk.Frame):
             self.create_tooltip(btn, tooltip_text)
         return btn
 
+    def _make_mousewheel_handler(self):
+        """Возвращает плавный обработчик скролла колесиком"""
+        def handler(event):
+            if hasattr(event, 'delta') and event.delta != 0:
+                delta = -1 * (event.delta // 30)
+            elif event.num == 4:
+                delta = -3
+            elif event.num == 5:
+                delta = 3
+            else:
+                return
+            
+            current_pos = self.canvas.yview()[0]
+            new_pos = current_pos + (delta / 100)
+            new_pos = max(0, min(1, new_pos))
+            self.canvas.yview_moveto(new_pos)
+            self.canvas.update_idletasks()
+        return handler
+
+    def _bind_mousewheel(self, widget):
+        """Привязывает скролл к виджету и всем его дочерним элементам рекурсивно"""
+        widget.bind("<MouseWheel>", self._mousewheel_handler, add="+")
+        widget.bind("<Button-4>", self._mousewheel_handler, add="+")
+        widget.bind("<Button-5>", self._mousewheel_handler, add="+")
+        for child in widget.winfo_children():
+            self._bind_mousewheel(child)
+
     # ── основной метод ────────────────────────────────────────────────────────
 
     def create_widgets(self):
@@ -100,10 +127,17 @@ class SettingsScreen(tk.Frame):
         canvas.configure(yscrollcommand=scrollbar.set)
         canvas.bind("<Configure>", lambda e: canvas.itemconfig(
             self._sf_win, width=e.width))
-        canvas.bind("<MouseWheel>", lambda e: canvas.yview_scroll(
-            int(-1 * (e.delta // 120)), "units"))
+        
         canvas.pack(side="left", fill="both", expand=True)
         scrollbar.pack(side="right", fill="y")
+        
+        self.canvas = canvas
+        self.scrollable_frame = sf
+        
+        # Универсальный обработчик скролла
+        self._mousewheel_handler = self._make_mousewheel_handler()
+        self._bind_mousewheel(canvas)
+        self._bind_mousewheel(sf)
 
         # ── Шапка (синяя, как навбар) ─────────────────────────────────────────
         header = tk.Frame(sf, bg=NAV_BG)
@@ -195,6 +229,9 @@ class SettingsScreen(tk.Frame):
                      wraplength=600, justify=tk.LEFT).pack(side=tk.LEFT)
 
         tk.Frame(sf, height=24, bg=Colors.BG_LIGHT).pack()
+        
+        # Привязываем скролл ко всем созданным виджетам
+        self._bind_mousewheel(sf)
     
     def create_tooltip(self, widget, text):
         """Создание всплывающей подсказки"""
@@ -231,16 +268,21 @@ class SettingsScreen(tk.Frame):
     def change_theme(self):
         """Изменение темы оформления"""
         new_theme = self.theme_var.get()
+        old_theme = self.settings.get("theme", "light")
+        
+        if new_theme == old_theme:
+            return
+        
         self.settings["theme"] = new_theme
         self.save_settings()
         
-        # Применяем тему
-        self.apply_theme(new_theme)
+        themes = {"light": "☀️ Светлая", "dark": "🌙 Тёмная"}
         
-        themes = {"light": "Светлая", "dark": "Темная"}
         messagebox.showinfo(
-            "Настройки сохранены", 
-            f"Тема '{themes[new_theme]}' выбрана.\nДля применения изменений перезапустите приложение."
+            "Настройки сохранены",
+            f"Выбрана тема: {themes[new_theme]}\n\n"
+            f"🔁 Для применения изменений перезапустите приложение.\n\n"
+            f"После перезапуска интерфейс откроется в выбранной теме."
         )
     
     def apply_theme(self, theme):

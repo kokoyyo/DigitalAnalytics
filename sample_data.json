@@ -1,0 +1,122 @@
+{
+  "export_date": "2026-05-27 12:00:00",
+  "version": "1.0",
+  "decks": [
+    {
+      "name": "Английский A1",
+      "description": "Базовые слова и фразы для начинающих",
+      "cards": [
+        {
+          "word": "apple",
+          "translation": "яблоко",
+          "example": "I eat an apple every day.",
+          "transcription": "/ˈæpəl/",
+          "status": "studied"
+        },
+        {
+          "word": "car",
+          "translation": "машина",
+          "example": "My car is red.",
+          "transcription": "/kɑːr/",
+          "status": "studied"
+        },
+        {
+          "word": "house",
+          "translation": "дом",
+          "example": "This is my house.",
+          "transcription": "/haʊs/",
+          "status": "not_studied"
+        },
+        {
+          "word": "happy",
+          "translation": "счастливый",
+          "example": "I am happy today.",
+          "transcription": "/ˈhæpi/",
+          "status": "not_studied"
+        },
+        {
+          "word": "big",
+          "translation": "большой",
+          "example": "This is a big house.",
+          "transcription": "/bɪɡ/",
+          "status": "not_studied"
+        }
+      ]
+    },
+    {
+      "name": "Неправильные глаголы",
+      "description": "Топ-10 неправильных глаголов",
+      "cards": [
+        {
+          "word": "go",
+          "translation": "идти",
+          "example": "I go to school every day.",
+          "transcription": "/ɡoʊ/",
+          "status": "studied"
+        },
+        {
+          "word": "went",
+          "translation": "пошел (прош.вр.)",
+          "example": "I went to the cinema yesterday.",
+          "transcription": "/went/",
+          "status": "studied"
+        },
+        {
+          "word": "gone",
+          "translation": "ушедший (прич.)",
+          "example": "He has gone to London.",
+          "transcription": "/ɡɒn/",
+          "status": "not_studied"
+        },
+        {
+          "word": "eat",
+          "translation": "есть",
+          "example": "I eat breakfast at 8 AM.",
+          "transcription": "/iːt/",
+          "status": "studied"
+        },
+        {
+          "word": "ate",
+          "translation": "ел (прош.вр.)",
+          "example": "I ate an apple.",
+          "transcription": "/eɪt/",
+          "status": "not_studied"
+        }
+      ]
+    },
+    {
+      "name": "Путешествия",
+      "description": "Слова для путешествий",
+      "cards": [
+        {
+          "word": "airport",
+          "translation": "аэропорт",
+          "example": "The airport is very big.",
+          "transcription": "/ˈeərpɔːt/",
+          "status": "not_studied"
+        },
+        {
+          "word": "ticket",
+          "translation": "билет",
+          "example": "I bought a ticket to Paris.",
+          "transcription": "/ˈtɪkɪt/",
+          "status": "not_studied"
+        },
+        {
+          "word": "hotel",
+          "translation": "отель",
+          "example": "We stayed at a nice hotel.",
+          "transcription": "/hoʊˈtel/",
+          "status": "not_studied"
+        },
+        {
+          "word": "passport",
+          "translation": "паспорт",
+          "example": "Don't forget your passport.",
+          "transcription": "/ˈpæspɔːt/",
+          "status": "not_studied"
+        }
+      ]
+    }
+  ]
+}

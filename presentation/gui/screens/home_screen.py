@@ -27,9 +27,13 @@ class HomeScreen(tk.Frame):
         self.header_frame = tk.Frame(self, bg=Colors.BG_WHITE)
         self.header_frame.pack(fill=tk.X, padx=20, pady=(20, 10))
         
+        # Верхняя строка с заголовком и кнопкой
+        top_row = tk.Frame(self.header_frame, bg=Colors.BG_WHITE)
+        top_row.pack(fill=tk.X)
+        
         # Заголовок
         title_label = tk.Label(
-            self.header_frame,
+            top_row,
             text="Мои колоды",
             font=Fonts.TITLE,
             bg=Colors.BG_WHITE,
@@ -39,7 +43,7 @@ class HomeScreen(tk.Frame):
         
         # Кнопка добавления
         add_btn = tk.Button(
-            self.header_frame,
+            top_row,
             text="+ Добавить колоду",
             command=self.add_deck,
             bg=Colors.PRIMARY,
@@ -52,20 +56,29 @@ class HomeScreen(tk.Frame):
         )
         add_btn.pack(side=tk.RIGHT, padx=20, pady=(10, 0))
         
-        # Блок статистики
+        # Блок статистики - с возможностью переноса текста
         self.stats_frame = tk.Frame(self.header_frame, bg=Colors.BG_WHITE)
-        self.stats_frame.pack(fill=tk.X, padx=20, pady=(60, 10))
-        
-        self.stats_label = tk.Label(
+        self.stats_frame.pack(fill=tk.X, padx=20, pady=(10, 10))
+
+        self.stats_total_label = tk.Label(
             self.stats_frame,
             text="",
             font=Fonts.BODY,
             bg=Colors.BG_WHITE,
-            fg=Colors.TEXT_GRAY
+            fg=Colors.TEXT_GRAY,
         )
-        self.stats_label.pack()
+        self.stats_total_label.pack(side=tk.LEFT)
+
+        self.stats_studied_label = tk.Label(
+            self.stats_frame,
+            text="",
+            font=Fonts.BODY,
+            bg=Colors.BG_WHITE,
+            fg=Colors.TEXT_GRAY,
+        )
+        self.stats_studied_label.pack(side=tk.LEFT, padx=(10, 0))
         
-        # Область для списка колод
+        # Область для списка колод (остается без изменений)
         canvas_container = tk.Frame(self, bg=Colors.BG_LIGHT)
         canvas_container.pack(fill=tk.BOTH, expand=True, padx=20, pady=(0, 20))
         
@@ -84,25 +97,61 @@ class HomeScreen(tk.Frame):
         self.canvas.pack(side="left", fill="both", expand=True)
         scrollbar.pack(side="right", fill="y")
 
-        def _on_mousewheel(event):
-            self.canvas.yview_scroll(int(-1 * (event.delta // 120)), "units")
-            # Форсируем перерисовку — фикс бага tkinter на Windows (исчезающий текст при скролле)
-            self.canvas.after_idle(self.canvas.update_idletasks)
-
-        self.canvas.bind("<MouseWheel>", _on_mousewheel)
-        self.decks_frame.bind("<MouseWheel>", _on_mousewheel)
+        # Универсальный обработчик скролла
+        self._mousewheel_handler = self._make_mousewheel_handler()
+        self._bind_mousewheel(self.canvas)
+        self._bind_mousewheel(self.decks_frame)
         self.canvas.bind("<Configure>", self._on_canvas_configure)
+    
+    def _make_mousewheel_handler(self):
+        """Возвращает плавный обработчик скролла колесиком"""
+        def handler(event):
+            # Плавный скролл с ускорением
+            if hasattr(event, 'delta') and event.delta != 0:
+                # Для Windows: delta обычно 120
+                delta = -1 * (event.delta // 30)
+            elif event.num == 4:
+                delta = -3
+            elif event.num == 5:
+                delta = 3
+            else:
+                return
+            
+            # Плавная прокрутка с анимацией
+            current_pos = self.canvas.yview()[0]
+            new_pos = current_pos + (delta / 100)
+            new_pos = max(0, min(1, new_pos))
+            self.canvas.yview_moveto(new_pos)
+            
+            # Принудительное обновление
+            self.canvas.update_idletasks()
+        return handler
+
+    def _bind_mousewheel(self, widget):
+        """Привязывает плавный скролл к виджету и всем его дочерним элементам"""
+        handler = self._make_mousewheel_handler()
+        widget.bind("<MouseWheel>", handler, add="+")
+        widget.bind("<Button-4>", handler, add="+")
+        widget.bind("<Button-5>", handler, add="+")
+        for child in widget.winfo_children():
+            self._bind_mousewheel(child)
     
     def _on_canvas_configure(self, event):
         """Обновление ширины контента при изменении размера canvas"""
         if event.width > 0:
             self.canvas.itemconfig(self._decks_window_id, width=event.width)
             self.update_deck_widths(event.width)
-        
     
     def on_resize(self, event):
         if hasattr(self, 'canvas') and self.canvas.winfo_width() > 0:
             self.update_deck_widths(self.canvas.winfo_width())
+            self.update_statistics()
+        # Обновляем wraplength stats при ресайзе
+        if hasattr(self, 'stats_frame'):
+            w = self.stats_frame.winfo_width()
+            if w > 0:
+                self.stats_total_label.config(wraplength=w // 2)
+                self.stats_studied_label.config(wraplength=w // 2)
     
     def update_deck_widths(self, width):
         if width > 0:
@@ -113,17 +162,16 @@ class HomeScreen(tk.Frame):
     def update_statistics(self):
         total_cards = 0
         studied_cards = 0
-        
+
         for deck in self.decks:
             cards = self.card_repo.get_by_deck(deck.id)
             total_cards += len(cards)
             studied_cards += sum(1 for c in cards if c.status == 'studied')
-        
+
         percent = (studied_cards / total_cards * 100) if total_cards > 0 else 0
-        
-        self.stats_label.config(
-            text=f"📊 Всего карточек: {total_cards}  |  Изучено: {studied_cards} ({percent:.0f}%)"
-        )
+
+        self.stats_total_label.config(text=f"📊 Всего карточек: {total_cards}")
+        self.stats_studied_label.config(text=f"  |  ✅ Изучено: {studied_cards} ({percent:.0f}%)")
     
     def load_decks(self):
         for widget in self.decks_frame.winfo_children():
@@ -142,6 +190,7 @@ class HomeScreen(tk.Frame):
                 justify=tk.CENTER
             )
             empty_label.pack(expand=True, pady=100)
+            self._bind_mousewheel(empty_label)
         else:
             for deck in self.decks:
                 self.create_deck_card(deck)
@@ -150,19 +199,17 @@ class HomeScreen(tk.Frame):
         
         if hasattr(self, 'canvas') and self.canvas.winfo_width() > 0:
             self.update_deck_widths(self.canvas.winfo_width())
+    
     def open_deck_by_id(self, deck_id):
         """Открыть колоду по ID"""
         print(f"open_deck_by_id ВЫЗВАН для ID: {deck_id}")
         
-        # Получаем колоду из репозитория
         deck = self.deck_repo.get_by_id(deck_id)
         if deck:
             self.open_deck(deck)
         else:
             print(f"Колода с ID {deck_id} не найдена!")
 
-
-            
     def create_deck_card(self, deck):
         cards = self.card_repo.get_by_deck(deck.id)
         total_cards = len(cards)
@@ -172,7 +219,6 @@ class HomeScreen(tk.Frame):
         current_width = self.canvas.winfo_width() if hasattr(self, 'canvas') and self.canvas.winfo_width() > 0 else 800
         deck_id = deck.id
 
-        # Frame вместо Button — нет системного hover-перерисования, нет мигания
         card_frame = tk.Frame(
             self.decks_frame,
             bg=Colors.BG_WHITE,
@@ -214,7 +260,6 @@ class HomeScreen(tk.Frame):
         )
         menu_btn.pack(side=tk.RIGHT)
 
-        # Описание
         desc_label = None
         if deck.description:
             desc_label = tk.Label(
@@ -264,7 +309,10 @@ class HomeScreen(tk.Frame):
         )
         progress_bar.pack(fill=tk.X, expand=True)
 
-        # Виджеты, на которые вешаем клик и hover (menu_btn исключён — у него свой обработчик)
+        # Привязываем скролл ко всем виджетам карточки
+        self._bind_mousewheel(card_frame)
+        
+        # Виджеты, на которые вешаем клик и hover
         clickable = [card_frame, inner_frame, top_frame, name_label,
                      stats_progress_frame, stats_label, percent_label, progress_frame]
         if desc_label:
@@ -290,7 +338,6 @@ class HomeScreen(tk.Frame):
             w.bind("<Button-1>", open_deck)
             w.bind("<Enter>", on_enter)
             w.bind("<Leave>", on_leave)
-
     
     def open_deck(self, deck):
         """Открыть колоду"""
@@ -298,7 +345,6 @@ class HomeScreen(tk.Frame):
         
         from presentation.gui.screens.deck_detail_screen import DeckDetailScreen
         
-        # Ищем content_container вверх по иерархии
         current = self
         parent_container = None
         while current:
@@ -317,7 +363,6 @@ class HomeScreen(tk.Frame):
             widget.destroy()
         
         print(f"Создаем DeckDetailScreen")
-        # Убираем третий аргумент main_app - передаем только parent и deck_id
         deck_screen = DeckDetailScreen(parent_container, deck.id)
         deck_screen.pack(fill=tk.BOTH, expand=True)
         print("DeckDetailScreen создан")
@@ -402,7 +447,6 @@ class HomeScreen(tk.Frame):
         root = self.winfo_toplevel()
         if hasattr(root, 'main_app'):
             main_app = root.main_app
-            # Ищем экран прогресса и обновляем его
             for widget in main_app.content_container.winfo_children():
                 if hasattr(widget, 'load_data'):
                     widget.load_data()
@@ -412,7 +456,6 @@ class HomeScreen(tk.Frame):
         if messagebox.askyesno("Подтверждение", f"Вы действительно хотите удалить колоду '{deck.name}'?\nВсе карточки будут также удалены!"):
             self.deck_repo.delete(deck.id)
             self.load_decks()
-            # Обновляем статистику на экране прогресса
             self.refresh_progress_screen()
             messagebox.showinfo("Успех", f"Колода '{deck.name}' удалена")
 
@@ -426,7 +469,6 @@ class HomeScreen(tk.Frame):
         """Обновление главного экрана"""
         self.load_decks()
         self.update_statistics()
-
 
     def refresh_all_stats(self):
         """Обновление статистики на всех экранах"""

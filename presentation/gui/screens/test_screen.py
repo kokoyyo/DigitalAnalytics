@@ -179,6 +179,34 @@ class TestScreen(tk.Frame):
         self.question_container.pack(expand=True, fill=tk.BOTH)
         self.update_progress_display()
     
+    def _make_mousewheel_handler(self):
+        """Возвращает плавный обработчик скролла колесиком"""
+        def handler(event):
+            if hasattr(event, 'delta') and event.delta != 0:
+                delta = -1 * (event.delta // 30)
+            elif event.num == 4:
+                delta = -3
+            elif event.num == 5:
+                delta = 3
+            else:
+                return
+            
+            current_pos = self.canvas.yview()[0]
+            new_pos = current_pos + (delta / 100)
+            new_pos = max(0, min(1, new_pos))
+            self.canvas.yview_moveto(new_pos)
+            self.canvas.update_idletasks()
+        return handler
+
+    def _bind_mousewheel(self, widget):
+        """Привязывает скролл к виджету и всем его дочерним элементам"""
+        widget.bind("<MouseWheel>", self._mousewheel_handler, add="+")
+        widget.bind("<Button-4>", self._mousewheel_handler, add="+")
+        widget.bind("<Button-5>", self._mousewheel_handler, add="+")
+        for child in widget.winfo_children():
+            self._bind_mousewheel(child)
+
+
     def update_progress_display(self):
         """Обновление отображения прогресса"""
         if self.current_question > 0:
@@ -266,15 +294,16 @@ class TestScreen(tk.Frame):
         
         percent = (self.correct_answers / self.total_questions) * 100
         time_spent_seconds = int(time.time() - self.start_time)
-        time_spent_minutes = int(time_spent_seconds / 60)
+        time_spent_minutes = round(time_spent_seconds / 60, 1)  # сохраняем с десятыми
         
-        # Сохраняем результаты в БД (в минутах)
+        # Сохраняем результаты в БД (в минутах с десятыми)
         self.stats_repo.add_test_result(
             self.deck_id, 
             self.total_questions, 
             self.correct_answers, 
             time_spent_minutes
         )
+        # ... остальной код
         
         # Если тест пройден (>=70%), отмечаем карточки как изученные
         if percent >= 70:
@@ -337,32 +366,38 @@ class TestScreen(tk.Frame):
                     f"Не хватает {needed:.0f}%", 
                     font=Fonts.BODY_BOLD, fg=Colors.ERROR, bg=Colors.BG_LIGHT).pack(pady=5)
         
+        # Вместо старого кода с canvas, вставьте этот:
         # Детали ответов (с прокруткой)
         details_frame = tk.LabelFrame(results_container, text="Детали ответов", 
-                                       font=Fonts.BODY_BOLD, bg=Colors.BG_WHITE, fg=Colors.TEXT_DARK)
+                                    font=Fonts.BODY_BOLD, bg=Colors.BG_WHITE, fg=Colors.TEXT_DARK)
         details_frame.pack(fill=tk.BOTH, expand=True, padx=20, pady=10)
-        
+
         # Canvas для прокрутки деталей
-        canvas = tk.Canvas(details_frame, bg=Colors.BG_WHITE, highlightthickness=0)
-        scrollbar = ttk.Scrollbar(details_frame, orient="vertical", command=canvas.yview)
-        scrollable_frame = tk.Frame(canvas, bg=Colors.BG_WHITE)
-        
-        scrollable_frame.bind(
+        self.canvas = tk.Canvas(details_frame, bg=Colors.BG_WHITE, highlightthickness=0)
+        scrollbar = ttk.Scrollbar(details_frame, orient="vertical", command=self.canvas.yview)
+        self.scrollable_frame = tk.Frame(self.canvas, bg=Colors.BG_WHITE)
+
+        self.scrollable_frame.bind(
             "<Configure>",
-            lambda e: canvas.configure(scrollregion=canvas.bbox("all"))
+            lambda e: self.canvas.configure(scrollregion=self.canvas.bbox("all"))
         )
-        canvas.create_window((0, 0), window=scrollable_frame, anchor="nw")
-        canvas.configure(yscrollcommand=scrollbar.set)
-        
-        canvas.pack(side="left", fill="both", expand=True)
+        self.canvas.create_window((0, 0), window=self.scrollable_frame, anchor="nw")
+        self.canvas.configure(yscrollcommand=scrollbar.set)
+
+        self.canvas.pack(side="left", fill="both", expand=True)
         scrollbar.pack(side="right", fill="y")
-        
+
+        # Универсальный обработчик скролла
+        self._mousewheel_handler = self._make_mousewheel_handler()
+        self._bind_mousewheel(self.canvas)
+        self._bind_mousewheel(self.scrollable_frame)
+
         # Заполняем детали
         for i, answer in enumerate(self.user_answers):
             color = Colors.SUCCESS if answer['is_correct'] else Colors.ERROR
             status = "✓" if answer['is_correct'] else "✗"
             
-            frame = tk.Frame(scrollable_frame, bg=Colors.BG_WHITE)
+            frame = tk.Frame(self.scrollable_frame, bg=Colors.BG_WHITE)
             frame.pack(fill=tk.X, padx=10, pady=5)
             
             tk.Label(frame, text=f"{status} {answer['question']} → {answer['correct']}", 

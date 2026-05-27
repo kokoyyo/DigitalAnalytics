@@ -63,7 +63,7 @@ def init_db():
         )
     ''')
     
-    # Создание таблицы для ежедневной статистики
+    # В init_db() измените создание таблицы daily_stats:
     cursor.execute('''
         CREATE TABLE IF NOT EXISTS daily_stats (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -71,7 +71,7 @@ def init_db():
             cards_studied INTEGER DEFAULT 0,
             correct_answers INTEGER DEFAULT 0,
             total_answers INTEGER DEFAULT 0,
-            time_spent INTEGER DEFAULT 0
+            time_spent REAL DEFAULT 0
         )
     ''')
     
@@ -450,29 +450,22 @@ class StatisticsRepository:
         conn = get_db_connection()
         cursor = conn.cursor()
         today = date.today().isoformat()
-
-        # Считаем уникальные карточки, отмеченные как изученные сегодня
-        cursor.execute(
-            "SELECT COUNT(*) FROM cards "
-            "WHERE status = 'studied' AND DATE(last_reviewed_at) = ? "
-            "AND deck_id IN (SELECT id FROM decks)",
-            (today,)
-        )
-        cards_studied = cursor.fetchone()[0]
-
-        # Процент правильных ответов и время — из daily_stats (заполняются тестами)
+        
         cursor.execute('SELECT * FROM daily_stats WHERE stat_date = ?', (today,))
         result = cursor.fetchone()
         conn.close()
-
+        
         if result:
             correct_percent = (result['correct_answers'] / result['total_answers'] * 100) if result['total_answers'] > 0 else 0
+            # time_spent хранится в минутах, преобразуем в секунды для форматирования
+            time_minutes = result['time_spent']
             return {
-                'cards_studied': cards_studied,
+                'cards_studied': result['cards_studied'],
                 'correct_percent': round(correct_percent, 1),
-                'time_spent': result['time_spent']
+                'time_spent_minutes': time_minutes,  # сохраняем минуты отдельно
+                'time_spent': time_minutes  # для обратной совместимости
             }
-        return {'cards_studied': cards_studied, 'correct_percent': 0, 'time_spent': 0}
+        return {'cards_studied': 0, 'correct_percent': 0, 'time_spent': 0, 'time_spent_minutes': 0}
     
     def get_global_stats(self):
         """Получить глобальную статистику (без кэширования)"""

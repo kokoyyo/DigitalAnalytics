@@ -24,10 +24,59 @@ class DeckDetailScreen(tk.Frame):
         self.load_cards()
         self.bind("<Configure>", self.on_resize)
     
+    def _make_mousewheel_handler(self):
+        """Возвращает плавный обработчик скролла колесиком"""
+        def handler(event):
+            if hasattr(event, 'delta') and event.delta != 0:
+                delta = -1 * (event.delta // 30)
+            elif event.num == 4:
+                delta = -3
+            elif event.num == 5:
+                delta = 3
+            else:
+                return
+            
+            current_pos = self.canvas.yview()[0]
+            new_pos = current_pos + (delta / 100)
+            new_pos = max(0, min(1, new_pos))
+            self.canvas.yview_moveto(new_pos)
+            self.canvas.update_idletasks()
+        return handler
+
+    def _bind_mousewheel(self, widget):
+        """Привязывает скролл к виджету и всем его дочерним элементам"""
+        widget.bind("<MouseWheel>", self._mousewheel_handler, add="+")
+        widget.bind("<Button-4>", self._mousewheel_handler, add="+")
+        widget.bind("<Button-5>", self._mousewheel_handler, add="+")
+        for child in widget.winfo_children():
+            self._bind_mousewheel(child)
+    
     def on_resize(self, event):
         """Обновление при изменении размера"""
         if hasattr(self, 'empty_label') and self.empty_label:
             self.center_empty_message()
+
+        if not hasattr(self, 'header_frame') or not hasattr(self, 'btn_frame'):
+            return
+
+        self.header_frame.update_idletasks()
+        total_w = self.header_frame.winfo_width()
+        btn_w = self.btn_frame.winfo_reqwidth()
+        name_min_w = 150  # минимальная ширина для названия
+
+        if total_w - btn_w - 60 < name_min_w:
+            # Не хватает места — название сверху, кнопки снизу
+            self.name_label.grid(row=0, column=0, columnspan=2, sticky="ew", padx=20, pady=(10, 0))
+            self.btn_frame.grid(row=1, column=0, columnspan=2, sticky="w", padx=20, pady=(5, 10))
+            available_w = total_w - 40
+        else:
+            # Хватает места — название слева, кнопки справа
+            self.name_label.grid(row=0, column=0, sticky="ew", padx=20, pady=10)
+            self.btn_frame.grid(row=0, column=1, sticky="e", padx=20, pady=10)
+            available_w = total_w - btn_w - 60
+
+        if available_w > 100:
+            self.name_label.config(wraplength=available_w)
     
     def center_empty_message(self):
         """Центрирование сообщения об отсутствии карточек"""
@@ -38,137 +87,114 @@ class DeckDetailScreen(tk.Frame):
     
     def create_widgets(self):
         """Создание виджетов"""
-        # Верхняя панель
         header_frame = tk.Frame(self, bg=Colors.BG_WHITE)
         header_frame.pack(fill=tk.X, padx=20, pady=20)
-        
-        # Название колоды
+
+        header_frame.grid_columnconfigure(0, weight=1)
+        header_frame.grid_columnconfigure(1, weight=0)
+
+        # Название колоды — wraplength обновляется динамически в on_resize
         self.name_label = tk.Label(
             header_frame,
             text=self.deck.name,
             font=Fonts.TITLE,
             bg=Colors.BG_WHITE,
-            fg=Colors.TEXT_DARK
+            fg=Colors.TEXT_DARK,
+            wraplength=400,
+            justify=tk.LEFT,
+            anchor=tk.W
         )
-        self.name_label.pack(side=tk.LEFT, padx=20)
-        
-        # Кнопки действий
+        self.name_label.grid(row=0, column=0, sticky="ew", padx=20, pady=10)
+
+        # Кнопки — в отдельном frame, переносятся на следующую строку если не влезают
         btn_frame = tk.Frame(header_frame, bg=Colors.BG_WHITE)
-        btn_frame.pack(side=tk.RIGHT, padx=20)
-        
+        btn_frame.grid(row=0, column=1, sticky="e", padx=20, pady=10)
+
         test_btn = tk.Button(
-            btn_frame,
-            text="📝 Тест",
-            command=self.start_test,
-            bg=Colors.SECONDARY,
-            fg=Colors.WHITE,
-            font=Fonts.BUTTON,
-            padx=15,
-            pady=5,
-            cursor="hand2"
+            btn_frame, text="📝 Тест", command=self.start_test,
+            bg=Colors.SECONDARY, fg=Colors.WHITE, font=Fonts.BUTTON,
+            padx=12, pady=5, cursor="hand2"
         )
-        test_btn.pack(side=tk.LEFT, padx=5)
+        test_btn.pack(side=tk.LEFT, padx=3)
         self.create_tooltip(test_btn, "Начать тестирование по колоде")
-        
+
         edit_btn = tk.Button(
-            btn_frame,
-            text="✏️ Редактировать",
-            command=self.edit_deck,
-            bg=Colors.INFO,
-            fg=Colors.WHITE,
-            font=Fonts.BUTTON,
-            padx=15,
-            pady=5,
-            cursor="hand2"
+            btn_frame, text="✏️ Редактировать", command=self.edit_deck,
+            bg=Colors.INFO, fg=Colors.WHITE, font=Fonts.BUTTON,
+            padx=12, pady=5, cursor="hand2"
         )
-        edit_btn.pack(side=tk.LEFT, padx=5)
+        edit_btn.pack(side=tk.LEFT, padx=3)
         self.create_tooltip(edit_btn, "Редактировать название и описание колоды")
-        
+
         delete_btn = tk.Button(
-            btn_frame,
-            text="🗑️ Удалить",
-            command=self.delete_deck,
-            bg=Colors.ERROR,
-            fg=Colors.WHITE,
-            font=Fonts.BUTTON,
-            padx=15,
-            pady=5,
-            cursor="hand2"
+            btn_frame, text="🗑️ Удалить", command=self.delete_deck,
+            bg=Colors.ERROR, fg=Colors.WHITE, font=Fonts.BUTTON,
+            padx=12, pady=5, cursor="hand2"
         )
-        delete_btn.pack(side=tk.LEFT, padx=5)
+        delete_btn.pack(side=tk.LEFT, padx=3)
         self.create_tooltip(delete_btn, "Удалить колоду и все карточки")
-        
+
         back_btn = tk.Button(
-            btn_frame,
-            text="← Назад",
-            command=self.go_back,
-            bg=Colors.TEXT_GRAY,
-            fg=Colors.WHITE,
-            font=Fonts.BUTTON,
-            padx=15,
-            pady=5,
-            cursor="hand2"
+            btn_frame, text="← Назад", command=self.go_back,
+            bg=Colors.TEXT_GRAY, fg=Colors.WHITE, font=Fonts.BUTTON,
+            padx=12, pady=5, cursor="hand2"
         )
-        back_btn.pack(side=tk.LEFT, padx=5)
+        back_btn.pack(side=tk.LEFT, padx=3)
         self.create_tooltip(back_btn, "Вернуться к списку колод")
-        
+
+        # Сохраняем ссылки для on_resize
+        self.header_frame = header_frame
+        self.btn_frame = btn_frame
+
         # Фильтры
         filters_frame = tk.Frame(self, bg=Colors.BG_LIGHT)
         filters_frame.pack(fill=tk.X, padx=20, pady=10)
-        
+
         tk.Label(filters_frame, text="Фильтр:", font=Fonts.BODY, bg=Colors.BG_LIGHT).pack(side=tk.LEFT)
-        
+
         self.filter_var = tk.StringVar(value="all")
         filters = [("📚 Все", "all"), ("✅ Изученные", "studied"), ("⭕ Неизученные", "not_studied")]
-        
+
         for text, value in filters:
             rb = tk.Radiobutton(
-                filters_frame,
-                text=text,
-                variable=self.filter_var,
-                value=value,
-                command=self.apply_filter,
-                bg=Colors.BG_LIGHT,
-                font=Fonts.BODY
+                filters_frame, text=text, variable=self.filter_var,
+                value=value, command=self.apply_filter,
+                bg=Colors.BG_LIGHT, font=Fonts.BODY
             )
             rb.pack(side=tk.LEFT, padx=10)
-        
+
         # Список карточек
-        cards_frame = tk.LabelFrame(self, text="Карточки", font=Fonts.SUBTITLE, bg=Colors.BG_WHITE, fg=Colors.PRIMARY)
+        cards_frame = tk.LabelFrame(
+            self, text="Карточки", font=Fonts.SUBTITLE,
+            bg=Colors.BG_WHITE, fg=Colors.PRIMARY
+        )
         cards_frame.pack(fill=tk.BOTH, expand=True, padx=20, pady=(0, 20))
-        
-        # Canvas для скроллинга
+
         canvas = tk.Canvas(cards_frame, bg=Colors.BG_WHITE, highlightthickness=0)
         scrollbar = ttk.Scrollbar(cards_frame, orient="vertical", command=canvas.yview)
         self.cards_container = tk.Frame(canvas, bg=Colors.BG_WHITE)
-        
-        self.cards_container.bind("<Configure>", lambda e: canvas.configure(scrollregion=canvas.bbox("all")))
-        canvas.create_window((0, 0), window=self.cards_container, anchor="nw", width=780)
+
+        self.cards_container.bind(
+            "<Configure>",
+            lambda e: canvas.configure(scrollregion=canvas.bbox("all"))
+        )
+        self._cards_window = canvas.create_window((0, 0), window=self.cards_container, anchor="nw")
         canvas.configure(yscrollcommand=scrollbar.set)
-        
+
         canvas.pack(side="left", fill="both", expand=True, padx=10, pady=10)
         scrollbar.pack(side="right", fill="y")
-        
-        def _on_mousewheel(event):
-            canvas.yview_scroll(int(-1*(event.delta/120)), "units")
-        
-        canvas.bind("<MouseWheel>", _on_mousewheel)
-        self.cards_container.bind("<MouseWheel>", _on_mousewheel)
-        
+
         self.canvas = canvas
         canvas.bind("<Configure>", self.on_canvas_configure)
-        
-        # Кнопка добавления карточки
+
+        self._mousewheel_handler = self._make_mousewheel_handler()
+        self._bind_mousewheel(canvas)
+        self._bind_mousewheel(self.cards_container)
+
         add_btn = tk.Button(
-            self,
-            text="+ Добавить карточку",
-            command=self.add_card,
-            bg=Colors.PRIMARY,
-            fg=Colors.WHITE,
-            font=Fonts.BUTTON,
-            padx=20,
-            pady=10,
-            cursor="hand2"
+            self, text="+ Добавить карточку", command=self.add_card,
+            bg=Colors.PRIMARY, fg=Colors.WHITE, font=Fonts.BUTTON,
+            padx=20, pady=10, cursor="hand2"
         )
         add_btn.pack(side=tk.BOTTOM, pady=20)
         self.create_tooltip(add_btn, "Добавить новую карточку в колоду")
@@ -226,6 +252,9 @@ class DeckDetailScreen(tk.Frame):
             self.empty_label = None
             for card in self.cards:
                 self.create_card_item(card)
+        
+        # Привязываем скролл к новым карточкам
+        self._bind_mousewheel(self.cards_container)
     
     def create_card_item(self, card):
         """Создание элемента карточки"""
@@ -356,6 +385,9 @@ class DeckDetailScreen(tk.Frame):
             command=lambda: self.delete_card(card)
         )
         delete_btn.pack(side=tk.LEFT)
+        
+        # Привязываем скролл к карточке
+        self._bind_mousewheel(card_frame)
     
     def apply_filter(self):
         self.current_filter = self.filter_var.get()
@@ -478,7 +510,6 @@ class DeckDetailScreen(tk.Frame):
         if messagebox.askyesno("Подтверждение", f"Удалить карточку '{card.word}'?"):
             self.card_repo.delete(card.id)
             self.load_cards()
-            # Принудительно обновляем статистику
             self.force_refresh_statistics()
             messagebox.showinfo("Успех", "Карточка удалена")
 
@@ -487,13 +518,9 @@ class DeckDetailScreen(tk.Frame):
         root = self.winfo_toplevel()
         if hasattr(root, 'main_app'):
             main_app = root.main_app
-            
-            # Очищаем кэш репозиториев
-            from data.repositories import StatisticsRepository, DeckRepository, CardRepository
+            from data.repositories import StatisticsRepository
             stats_repo = StatisticsRepository()
             stats_repo.refresh()
-            
-            # Обновляем все экраны
             for widget in main_app.content_container.winfo_children():
                 if hasattr(widget, 'refresh'):
                     widget.refresh()
@@ -502,20 +529,6 @@ class DeckDetailScreen(tk.Frame):
                 elif hasattr(widget, 'load_decks'):
                     widget.load_decks()
 
-    def refresh_all_stats(self):
-        """Обновление статистики на всех экранах"""
-        root = self.winfo_toplevel()
-        if hasattr(root, 'main_app'):
-            main_app = root.main_app
-            # Обновляем главный экран
-            for widget in main_app.content_container.winfo_children():
-                if hasattr(widget, 'load_decks'):
-                    widget.load_decks()
-                if hasattr(widget, 'load_data'):
-                    widget.load_data()
-                if hasattr(widget, 'refresh'):
-                    widget.refresh()
-    
     def edit_deck(self):
         """Редактирование колоды"""
         dialog = tk.Toplevel(self)
@@ -558,13 +571,11 @@ class DeckDetailScreen(tk.Frame):
         tk.Button(btn_frame, text="Сохранить", command=save, bg=Colors.PRIMARY, fg=Colors.WHITE, padx=25, pady=5).pack(side=tk.LEFT, padx=5)
         tk.Button(btn_frame, text="Отмена", command=dialog.destroy, bg=Colors.TEXT_GRAY, fg=Colors.WHITE, padx=25, pady=5).pack(side=tk.LEFT, padx=5)
     
-    
     def delete_deck(self):
         """Удаление колоды"""
         if messagebox.askyesno("Подтверждение", f"Удалить колоду '{self.deck.name}'?\nВсе карточки будут также удалены!"):
             self.deck_repo.delete(self.deck_id)
             self.go_back()
-            # Обновляем статистику на экране прогресса
             self.refresh_progress_screen()
             messagebox.showinfo("Успех", "Колода удалена")
 
@@ -576,7 +587,6 @@ class DeckDetailScreen(tk.Frame):
             for widget in main_app.content_container.winfo_children():
                 if hasattr(widget, 'load_data'):
                     widget.load_data()
-
 
     def start_test(self):
         """Начать тестирование"""
@@ -611,7 +621,11 @@ class DeckDetailScreen(tk.Frame):
     
     def on_canvas_configure(self, event):
         if event.width > 0:
-            self.canvas.itemconfig(1, width=event.width)
+            self.canvas.itemconfig(self._cards_window, width=event.width)
+            # Обновляем wraplength примеров в карточках
+            for frame in self.card_frames if hasattr(self, 'card_frames') else []:
+                if hasattr(frame, 'example_label'):
+                    frame.example_label.config(wraplength=event.width - 60)
     
     def go_back(self):
         """Вернуться к списку колод"""
