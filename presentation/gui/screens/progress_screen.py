@@ -28,8 +28,11 @@ class ProgressScreen(tk.Frame):
         if minutes <= 0:
             return "0 мин"
         
-        mins = int(minutes)
-        secs = int((minutes - mins) * 60)
+        # Округляем до 2 знаков для точности
+        total_seconds = int(round(minutes * 60))
+        
+        mins = total_seconds // 60
+        secs = total_seconds % 60
         
         if mins > 0 and secs > 0:
             return f"{mins} мин {secs} сек"
@@ -293,18 +296,17 @@ class ProgressScreen(tk.Frame):
         correct_percent = today_stats['correct_percent']
         time_spent_minutes = today_stats.get('time_spent_minutes', today_stats['time_spent'])
 
-        # Форматируем время
-        if time_spent_minutes >= 60:
-            hours = int(time_spent_minutes // 60)
-            mins = int(time_spent_minutes % 60)
-            time_str = f"{hours} ч {mins} мин"
-        elif time_spent_minutes > 0:
-            mins = int(time_spent_minutes)
-            secs = int((time_spent_minutes - mins) * 60)
-            if secs > 0:
-                time_str = f"{mins} мин {secs} сек"
-            else:
-                time_str = f"{mins} мин"
+        # ФОРМАТИРОВАНИЕ ВРЕМЕНИ БЕЗ ПОГРЕШНОСТЕЙ
+        total_seconds = int(round(time_spent_minutes * 60))
+        mins = total_seconds // 60
+        secs = total_seconds % 60
+
+        if mins > 0 and secs > 0:
+            time_str = f"{mins} мин {secs} сек"
+        elif mins > 0:
+            time_str = f"{mins} мин"
+        elif secs > 0:
+            time_str = f"{secs} сек"
         else:
             time_str = "0 мин"
 
